@@ -1,0 +1,30 @@
+# --- Python / uv ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.python-version
+uv.lock
+
+# --- Environment / Secrets ---
+.env
+.env.*
+!.env.example
+*.log
+
+# --- PyCharm (JetBrains) ---
+.idea/
+*.iml
+cmake-build-*/
+out/
+
+# --- FastAPI / Testing ---
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# --- OS Specific ---
+.DS_Store
+Thumbs.db
