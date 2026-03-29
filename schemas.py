@@ -1,8 +1,12 @@
+from typing import List
+
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from datetime import datetime
 
+
 class Base(BaseModel):
     pass
+
 
 # ======================================================================================================================
 # USERS SCHEMAS
@@ -10,7 +14,7 @@ class Base(BaseModel):
 
 class UserBase(Base):
     username : str   = Field(min_length=5, max_length=50)
-    email : EmailStr = Field(max_length=50)
+    email : EmailStr = Field(max_length=120)
 
 
 class UserCreate(UserBase):
@@ -19,22 +23,20 @@ class UserCreate(UserBase):
 
 class UserPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    id : int
-    username : str
-    image_path : str
-    image_file : str
+    id         : int
+    username   : str
+    image_path : str | None = None
 
 
 class UserPrivate(UserPublic):
     email : EmailStr
 
 
-class UserUpdate(UserCreate):
-    username : str | None = Field(min_length=5, max_length=50)
-    email : EmailStr | None = Field(max_length=50)
-    password : str | None = Field(min_length=8)
+class UserUpdate(UserBase):
+    username   : str | None = Field(min_length=5, max_length=50)
+    email      : EmailStr | None = Field(max_length=120)
+    password   : str | None = Field(min_length=8)
     image_path : str | None
-    image_file : str | None
 
 
 class ChangePassword(BaseModel):
@@ -43,30 +45,69 @@ class ChangePassword(BaseModel):
 
 
 # ======================================================================================================================
-# REMINDERS SCHEMAS
+# TASK SCHEMAS
 # ======================================================================================================================
 
-class ReminderBase(BaseModel):
-    title: str = Field(min_length=1, max_length=100)
-    content: str = Field(min_length=1, max_length=300)
-    due_date : datetime
+class TaskBase(BaseModel):
+    title     : str = Field(min_length=1, max_length=100)
+    content   : str = Field(min_length=1, max_length=300)
+    is_public : bool = Field(default=False)
+    due_date  : datetime
 
 
-class ReminderCreate(ReminderBase):
-    pass
+class TaskCreate(TaskBase):
+    due_date : datetime | None = None
 
 
-class ReminderResponse(ReminderBase):
+class TaskResponse(TaskBase):
     model_config = ConfigDict(from_attributes=True)
 
-    id : int
-    owner_id : UserPublic
+    id           : int
+    creator_id   : int
+    workspace_id : int | None
     date_created : datetime
-    due_date : datetime
-    status : bool
+    due_date     : datetime
+    owner        : UserPublic
+    is_completed : bool
 
 
-class ReminderUpdate(ReminderBase):
-    content : str | None = Field(min_length=1, max_length=300)
-    due_date : datetime | None
-    status : bool | None
+class TaskUpdate(TaskBase):
+    content      : str | None = Field(default=None, min_length=1, max_length=300)
+    workspace_id : int | None
+    is_completed : bool | None = None
+    is_public    : bool | None = None
+    due_date     : datetime | None = None
+
+
+# ======================================================================================================================
+# WORKSPACE SCHEMAS
+# ======================================================================================================================
+
+
+class WorkspaceBase(BaseModel):
+    title       : str = Field(min_length=1, max_length=50)
+    description : str = Field(min_length=1, max_length=500)
+    due_date    : datetime | None = None
+
+
+class WorkspaceCreate(WorkspaceBase):
+    pass
+
+class WorkspaceResponse(WorkspaceBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id           : int
+    title        : str
+    description  : str
+    date_created : datetime
+    due_date     : datetime
+
+
+class WorkspaceUpdate(WorkspaceBase):
+    title        : str | None = Field(min_length=1, max_length=50, default=None)
+    description  : str | None = Field(min_length=1, max_length=500, default=None)
+    due_date     : datetime | None
+    is_completed : bool | None = None
+
+
+
