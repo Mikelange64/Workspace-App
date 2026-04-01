@@ -2,16 +2,20 @@ from fastapi import APIRouter, Depends, status, HTTPException
 
 from typing import Annotated
 
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload, joinedload
 
-from database import get_db
-from models import User, Task, Workspace
-from schemas import (
-    WorkspaceCreate, WorkspaceUpdate, WorkspaceResponse, TaskResponse
-)
+from app.database import get_db
+
+from app.models.users import User
+from app.models.workspaces import Workspace
+
+from app.schemas.workspaces import WorkspaceCreate, WorkspaceUpdate, WorkspaceResponse
+from app.schemas.tasks import TaskResponse
+
 
 router = APIRouter()
+
 
 @router.post("/{user_id}", response_model=WorkspaceResponse, status_code=status.HTTP_201_CREATED)
 def create_workspace(
@@ -187,4 +191,3 @@ def delete_workspace(workspace_id: int, user_id: int, db: Annotated[Session, Dep
 
     if user not in workspace.members:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not authorized to update this task")
-

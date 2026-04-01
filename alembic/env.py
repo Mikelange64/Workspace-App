@@ -4,10 +4,9 @@ from sqlalchemy import engine_from_config, pool
 from alembic import context
 from dotenv import load_dotenv
 
-from database import Base
+from app.models import Base
 
 # I have to import this so alembic knows they use the Base class
-from models import User, Task, Workspace
 
 # This loads your .env file
 load_dotenv()

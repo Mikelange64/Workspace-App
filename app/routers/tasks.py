@@ -2,16 +2,18 @@ from fastapi import APIRouter, HTTPException, status, Depends
 
 from typing import Annotated
 
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 
-from database import get_db
-from models import Task, User, Workspace
-from schemas import (
-    TaskCreate, TaskResponse, TaskUpdate, TaskMove,
-    UserCreate, UserPublic, UserPrivate, UserUpdate
-)
+from app.database import get_db
+
+from app.models.users import User
+from app.models.tasks import Task
+from app.models.workspaces import Workspace
+
+from app.schemas.tasks import TaskCreate, TaskResponse, TaskUpdate, TaskMove
+
 
 router = APIRouter()
 

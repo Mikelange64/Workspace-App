@@ -11,9 +11,9 @@ from pwdlib import PasswordHash
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from models import User
-from database import get_db
-from config import settings
+from app.models.users import User
+from app.database import get_db
+from app.config import settings
 
 
 pw_hasher = PasswordHash.recommended()

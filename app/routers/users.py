@@ -8,11 +8,16 @@ from sqlalchemy.orm import Session
 
 from typing import Annotated
 
-from database import get_db
-from models import User, Task
-from schemas import UserCreate, UserPublic, UserPrivate, UserUpdate, ChangePassword, TaskResponse, Token
-from auth import verify_password, hash_password, create_access_token
-from config import settings
+from app.database import get_db
+
+from app.models.users import User
+from app.models.tasks import Task
+
+from app.schemas.users import UserCreate, UserPublic, UserPrivate, UserUpdate, Token
+from app.schemas.tasks import TaskResponse
+
+from app.auth import verify_password, create_access_token
+from app.config import settings
 
 router = APIRouter()
 
