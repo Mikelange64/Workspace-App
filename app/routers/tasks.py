@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, joinedload
 
 
 from app.database import get_db
+from app.auth import CurrentUser
 
 from app.models.users import User
 from app.models.tasks import Task
@@ -15,12 +16,13 @@ from app.models.workspaces import Workspace
 from app.schemas.tasks import TaskCreate, TaskResponse, TaskUpdate, TaskMove
 
 
+
 router = APIRouter()
+
 
 @router.post("/{user_id}", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
 def create_task(user_id: int, task: TaskCreate, db: Annotated[Session, Depends(get_db)]):
-    result = db.execute(select(User).where(User.id == user_id))
-    user = result.scalars().first()
+    user = db.execute(select(User).where(User.id == user_id)).scalars().first()
 
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -30,17 +32,18 @@ def create_task(user_id: int, task: TaskCreate, db: Annotated[Session, Depends(g
         content=task.content,
         creator_id=user.id,
         workspace_id=task.workspace_id,
-        is_public=task.is_public,
         due_date=task.due_date,
     )
+
     db.add(new_task)
     db.commit()
     db.refresh(new_task)
     return new_task
 
 
-@router.get("/{task_id}", response_model=TaskResponse)
-def get_task(task_id: int, db: Annotated[Session, Depends(get_db)]):
+@router.get("/me/{task_id}", response_model=TaskResponse)
+def get_task(task_id: int, current_user: CurrentUser, db: Annotated[Session, Depends(get_db)]):
+
     result = db.execute(select(Task).where(Task.id == task_id))
     task = result.scalars().first()
 

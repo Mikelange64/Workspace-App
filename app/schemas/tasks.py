@@ -10,7 +10,6 @@ class TaskBase(BaseModel):
     title     : str = Field(min_length=1, max_length=100)
     content   : str = Field(min_length=1, max_length=300)
     workspace_id : int | None = None
-    is_public : bool = Field(default=False)
     due_date  : datetime | None = None
 
 
@@ -30,10 +29,10 @@ class TaskResponse(TaskBase):
 
 
 class TaskUpdate(TaskBase):
+    title            : str | None = None
     content      : str | None = Field(default=None, min_length=1, max_length=300)
     workspace_id : int | None = None
     is_completed : bool | None = None
-    is_public    : bool | None = None
     due_date     : datetime | None = None
 
 

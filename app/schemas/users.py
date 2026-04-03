@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
-from datetime import datetime
+
 
 class Base(BaseModel):
     pass
@@ -16,6 +16,7 @@ class UserCreate(UserBase):
 
 class UserPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+
     id         : int
     username   : str
     image_path : str | None = None

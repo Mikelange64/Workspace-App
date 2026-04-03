@@ -1,7 +1,7 @@
 from __future__ import annotations
-
 from datetime import datetime, UTC
-from sqlalchemy import String, Integer, DateTime, ForeignKey, Text, Boolean, Table, Column
+
+from sqlalchemy import String, Integer, Boolean, ForeignKey, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -14,6 +14,7 @@ class User(Base) :
     username      : Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     email         : Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
     password_hash : Mapped[str] = mapped_column(String(100), nullable=False)
+    is_superuser  : Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     image_path    : Mapped[str | None] = mapped_column(String(100), nullable=True, default=None)
 
     created_tasks : Mapped[list["Task"]] = relationship(
@@ -21,8 +22,9 @@ class User(Base) :
         back_populates="creator",
     )
     workspaces : Mapped[list["Workspace"]] = relationship(
-        secondary="user_workspace",
-        back_populates="members"
+        secondary="workspace_member",
+        back_populates="members",
+        viewonly=True,
     )
 
     @property

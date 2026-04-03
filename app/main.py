@@ -12,9 +12,11 @@ from sqlalchemy.orm import Session
 
 from typing import Annotated
 
-from database import engine, get_db, Base
-from models import User, Task
-from routers import users, tasks, workspaces
+from app.database import engine, get_db, Base
+from app.models.users import User
+from app.models.tasks import Task
+from app.routers import users, tasks, workspaces
+from app.admin import admin_users
 
 
 Base.metadata.create_all(bind=engine)
@@ -27,6 +29,7 @@ app.mount("/media", StaticFiles(directory="templates"), name="static")
 app.include_router(users.router, prefix="/api/user", tags=["user"])
 app.include_router(tasks.router, prefix="/api/task", tags=["task"])
 app.include_router(workspaces.router, prefix="/api/workspaces", tags=["workspaces"])
+app.include_router(admin_users.router, prefix="/api/admin-users", tags=["admin_users"])
 
 
 @app.get("/{user_id}", include_in_schema=False)

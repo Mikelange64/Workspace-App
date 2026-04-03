@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import datetime, UTC
 from sqlalchemy import String, Integer, DateTime, ForeignKey, Text, Boolean, Table, Column
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -14,7 +12,6 @@ class Task(Base) :
     title        : Mapped[str] = mapped_column(String(50), nullable=False)
     content      : Mapped[str] = mapped_column(Text, nullable=False)
     is_completed : Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    is_public    : Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     creator_id   : Mapped[int] = mapped_column(
         Integer,
@@ -25,7 +22,7 @@ class Task(Base) :
     workspace_id : Mapped[int] = mapped_column(
         Integer,
         ForeignKey('workspace.id'),
-        nullable=True,
+        nullable=False,
         index=True
     )
 
