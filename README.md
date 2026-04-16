@@ -89,7 +89,7 @@ The API will be available at `http://localhost:8000`. Interactive docs are at `/
 | Method | Endpoint | Description |
 |---|---|---|
 | `POST` | `/api/user` | Register a new user |
-| `GET` | `/api/user/login` | Login and receive a JWT |
+| `POST` | `/api/user/login` | Login and receive a JWT |
 | `GET` | `/api/user/me` | Get current user profile |
 | `PATCH` | `/api/user/me` | Update profile |
 | `DELETE` | `/api/user/me` | Delete account |
@@ -101,3 +101,5 @@ The API will be available at `http://localhost:8000`. Interactive docs are at `/
 | `POST` | `/api/task` | Create a task |
 | `PATCH` | `/api/task/{id}` | Update a task |
 | `DELETE` | `/api/task/{id}` | Delete a task |
+
+This project is currently under active development. The backend API is functional; the React frontend is in progress.
