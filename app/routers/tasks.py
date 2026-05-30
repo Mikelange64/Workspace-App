@@ -5,34 +5,36 @@ from typing import Annotated
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
-
 from app.database import get_db
 from app.auth import CurrentUser
 
-from app.models.users import User
-from app.models.tasks import Task
-from app.models.workspaces import Workspace
-
-from app.schemas.tasks import TaskCreate, TaskResponse, TaskUpdate, TaskMove
-
+from app.utility import get_target_membership, require_membership, require_admin
+from app.models import User, Task, Workspace, WorkspaceMember
+from app.schemas import (
+    TaskCreate, 
+    TaskResponse, 
+    TaskUpdate, 
+    TaskMove,
+    WorkspaceResponse
+)
 
 
 router = APIRouter()
 
 
-@router.post("/{user_id}", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
-def create_task(user_id: int, task: TaskCreate, db: Annotated[Session, Depends(get_db)]):
-    user = db.execute(select(User).where(User.id == user_id)).scalars().first()
-
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-
+@router.post("/", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
+def create_task(
+    task         : TaskCreate, 
+    db           : Annotated[Session, Depends(get_db)],
+    current_user : Annotated[WorkspaceMember, Depends(require_membership)], 
+):
     new_task = Task(
-        title=task.title,
-        content=task.content,
-        creator_id=user.id,
-        workspace_id=task.workspace_id,
-        due_date=task.due_date,
+        title        = task.title,
+        content      = task.content,
+        creator_id   = current_user.user_id,
+        owner_id     = current_user.user_id,
+        workspace_id = task.workspace_id,
+        due_date     = task.due_date,
     )
 
     db.add(new_task)
@@ -41,11 +43,16 @@ def create_task(user_id: int, task: TaskCreate, db: Annotated[Session, Depends(g
     return new_task
 
 
-@router.get("/me/{task_id}", response_model=TaskResponse)
-def get_task(task_id: int, current_user: CurrentUser, db: Annotated[Session, Depends(get_db)]):
-
-    result = db.execute(select(Task).where(Task.id == task_id))
-    task = result.scalars().first()
+@router.get("/me/{task_id}/{workspace_id}", response_model=TaskResponse)
+def get_task(
+    task_id      : int, 
+    workspace_id : int,
+    db           : Annotated[Session, Depends(get_db)],
+    current_user : Annotated[Session, Depends(require_membership)],
+):
+    task = db.execute(
+        select(Task).where(Task.id == task_id)
+    ).scalars().first()
 
     if not task:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
@@ -53,22 +60,50 @@ def get_task(task_id: int, current_user: CurrentUser, db: Annotated[Session, Dep
     return task
 
 
-@router.patch("/{task_id}/{user_id}", response_model=TaskResponse)
-def update_task_partial(task_id: int, user_id: int, task_data: TaskUpdate, db :Annotated[Session, Depends(get_db)]):
-    task_result = db.execute(select(Task).where(Task.id == task_id))
-    task = task_result.scalars().first()
+@router.patch("/make-owner/{workspace_id}/{user_id}/{task_id}", response_model=WorkspaceResponse)
+def make_owner(
+    user_id      : int,
+    task_id      : int,
+    workspace_id : int,
+    db           : Annotated[Session, Depends(get_db)],
+    current_user : Annotated[WorkspaceMember, Depends(require_admin)],
+):
+    member = get_target_membership(workspace_id, user_id, db)
+
+    if not member:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="User is not a member of this workspace"
+        )
+
+    task = db.execute(
+        select(Task).where(Task.id == task_id)
+    ).scalars().first()
+
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail = "Workspace not found")
+
+    task.owner_id = member.user_id
+    
+    db.commit()
+    db.refresh(task)
+    
+    return task
+
+
+@router.patch("/{task_id}/{workspace_id}", response_model=TaskResponse)
+def update_task_partial(
+    task_id      : int, 
+    workspace_id : int,
+    task_data    : TaskUpdate, 
+    db           : Annotated[Session, Depends(get_db)],
+    user         : Annotated[WorkspaceMember, Depends(require_membership)],
+):
+    task = db.execute(
+        select(Task).where(Task.id == task_id)
+    ).scalars().first()
 
     if not task:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
-
-    user_result = db.execute(select(User).where(User.id == user_id))
-    user = user_result.scalars().first()
-
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-
-    if user.id != task.creator_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not authorized to update this task")
 
     update = task_data.model_dump(exclude_unset=True)
     for field, value in update.items():
@@ -77,52 +112,16 @@ def update_task_partial(task_id: int, user_id: int, task_data: TaskUpdate, db :A
     db.commit()
     db.refresh(task)
     return task
-
-
-@router.patch("{task_id}/{user_id}/{workspace_id}/", response_model=TaskResponse)
-def move_task(task_id: int, user_id: int, workspace_id: int, task_data: TaskMove, db :Annotated[Session, Depends(get_db)]):
-    task_result = db.execute(select(Task).where(Task.id == task_id))
-    task = task_result.scalars().first()
-
-    if not task:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
-
-    user_result = db.execute(select(User).where(User.id == user_id))
-    user = user_result.scalars().first()
-
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-
-    workspace_result = db.execute(
-        select(Workspace)
-        .options(joinedload(Workspace.members))
-        .where(Workspace.id == workspace_id)
-    )
-    workspace = workspace_result.scalars().first()
-
-    if not workspace:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
-
-    is_creator = user.id == task.creator_id
-    is_member = user in workspace.members
-
-    if not is_member and not is_creator:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User not authorized to move task")
-
-    if not is_member:
-        workspace.members.append(user)
-
-    task.workspace_id = task_data.workspace_id
-
-    db.commit()
-    db.refresh(workspace)
-    db.refresh(task)
-
-    return task
-
-
-@router.put("/{task_id}/{user_id}", response_model=TaskResponse)
-def update_task_full(task_id: int, user_id: int, task_data: TaskCreate, db:Annotated[Session, Depends(get_db)]):
+    
+    
+@router.put("/{task_id}/{workspace_id}", response_model=TaskResponse)
+def update_task_full(
+    task_id      : int, 
+    workspace_id : int,
+    task_data    : TaskCreate, 
+    db           : Annotated[Session, Depends(get_db)],
+    current_user : Annotated[WorkspaceMember, Depends(require_membership)], 
+):
     task_result = db.execute(select(Task).where(Task.id == task_id))
     task = task_result.scalars().first()
 
@@ -150,22 +149,76 @@ def update_task_full(task_id: int, user_id: int, task_data: TaskCreate, db:Annot
     return task
 
 
-@router.delete("/{task_id}/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_task(task_id: int, user_id: int, db:Annotated[Session, Depends(get_db)]):
-    task_result = db.execute(select(Task).where(Task.id == task_id))
-    task = task_result.scalars().first()
+@router.patch("/{task_id}/{workspace_id}", response_model=TaskResponse)
+def complete_task(
+    task_id      : int, 
+    workspace_id : int, 
+    db           : Annotated[Session, Depends(get_db)],
+    current_user : Annotated[WorkspaceMember, Depends(require_membership)], 
+) :
+    task = db.execute(
+        select(Task).where(Task.id == task_id)
+    ).scalars().first()
+
+    if not task :
+        raise  HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Task not found"
+        )
+
+    if task.owner_id == current_user.user_id :
+        raise  HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="User is not the owner of this task"
+        )
+        
+    task.is_completed = True
+
+    db.commit()
+    db.refresh(task)
+
+    return task
+
+
+@router.patch("{task_id}/{workspace_id}/", response_model=WorkspaceResponse)
+def move_task(
+    task_id      : int,
+    workspace_id : int,
+    task_data    : TaskMove,
+    db           : Annotated[Session, Depends(get_db)],
+    user         : Annotated[WorkspaceMember, Depends(require_admin)],
+):
+    task = db.execute(
+        select(Task).where(Task.id == task_id)
+    ).scalars().first()
 
     if not task:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
 
-    user_result = db.execute(select(User).where(User.id == user_id))
-    user = user_result.scalars().first()
+    task.workspace_id = task_data.workspace_id
 
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    db.commit()
+    db.refresh(task)
 
-    if user.id != task.creator_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not authorized to delete this task")
+    workspace = db.execute(
+        select(Workspace)
+        .where(Workspace.id == task.workspace_id)
+    ).scalars().first()
+
+    return workspace
+
+
+@router.delete("/{task_id}/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_task(
+    task_id      : int,
+    workspace_id : int,
+    db           : Annotated[Session, Depends(get_db)],
+    current_user : Annotated[WorkspaceMember, Depends(require_admin)],
+):
+    task = db.execute(
+        select(Task).where(Task.id == task_id)
+    ).scalars().first()
+
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
 
     db.delete(task)
     db.commit()

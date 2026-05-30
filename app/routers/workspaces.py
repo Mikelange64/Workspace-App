@@ -1,29 +1,27 @@
-from fastapi import APIRouter, Depends, status, HTTPException
-
 from typing import Annotated
 
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.users import User
-from app.models.workspaces import Workspace
-from app.models.association import WorkspaceMember
-
-from app.schemas.workspaces import WorkspaceCreate, WorkspaceUpdate, WorkspaceResponse
-from app.schemas.tasks import TaskResponse
-
-from app.database import get_db
 from app.auth import CurrentUser
-from app.utility import require_admin, require_membership, get_target_membership
+from app.database import get_db
+from app.utility import get_target_membership, require_admin, require_membership
 
-router = APIRouter()
+from app.models import Workspace, WorkspaceMember
+from app.schemas import (
+    TaskResponse, UserPublic,
+    WorkspaceCreate, WorkspaceResponse, WorkspaceUpdate
+)
+
+router = APIRouter() 
 
 
 @router.post("", response_model=WorkspaceResponse, status_code=status.HTTP_201_CREATED)
 def create_workspace(
-        current_user: CurrentUser,
-        workspace: WorkspaceCreate,
-        db: Annotated[Session, Depends(get_db)]
+    current_user : CurrentUser,
+    workspace    : WorkspaceCreate,
+    db           : Annotated[Session, Depends(get_db)],
 ):
     new_workspace = Workspace(
         creator_id=current_user.id,
@@ -32,11 +30,12 @@ def create_workspace(
         max_number=workspace.max_number,
         due_date=workspace.due_date,
     )
-
+    
+    db.add(new_workspace)
+    db.flush() # flush is for when the object is not yet in the db
+    
     new_member = WorkspaceMember(
-        user_id=current_user.id,
-        workspace_id=new_workspace.id,
-        role="admin"
+        user_id=current_user.id, workspace_id=new_workspace.id, role="admin"
     )
 
     db.add(new_workspace)
@@ -50,112 +49,192 @@ def create_workspace(
 @router.get("/{workspace_id}", response_model=WorkspaceResponse)
 def get_workspace(workspace_id: int, db: Annotated[Session, Depends(get_db)]):
     result = db.execute(
-            select(Workspace).options(
-                joinedload(Workspace.members),
-                joinedload(Workspace.tasks)
-            ).where(Workspace.id == workspace_id)
+        select(Workspace)
+        .options(joinedload(Workspace.members), joinedload(Workspace.tasks))
+        .where(Workspace.id == workspace_id)
     )
     workspace = result.scalars().first()
 
     if not workspace:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found"
+        )
 
     return workspace
 
 
 @router.get("/tasks/{workspace_id}", response_model=list[TaskResponse])
 def get_tasks(
-        workspace_id: int,
-        current_user : Annotated[WorkspaceMember, Depends(require_membership)],
-        db: Annotated[Session, Depends(get_db)]
+    workspace_id : int,
+    db           : Annotated[Session, Depends(get_db)],
+    current_user : Annotated[WorkspaceMember, Depends(require_membership)],
 ):
-    workspace = db.execute(select(Workspace).where(Workspace.id == workspace_id)).scalars().first()
+    workspace = (
+        db.execute(select(Workspace).where(Workspace.id == workspace_id))
+        .scalars()
+        .first()
+    )
+
+    if not workspace:
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
     return workspace.tasks
 
 
-@router.get("/members/{workspace_id}/", response_model=list[TaskResponse])
+@router.get("/members/{workspace_id}/", response_model=list[UserPublic])
 def get_members(
-        workspace_id: int,
-        current_user : Annotated[WorkspaceMember, Depends(require_membership)],
-        db: Annotated[Session, Depends(get_db)]
+    workspace_id : int,
+    db           : Annotated[Session, Depends(get_db)],
+    current_user : Annotated[WorkspaceMember, Depends(require_membership)],
 ):
-    workspace = db.execute(select(Workspace).where(Workspace.id == workspace_id)).scalars().first()
+    workspace = (
+        db.execute(select(Workspace).where(Workspace.id == workspace_id))
+        .scalars()
+        .first()
+    )
+
+    if not workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="workspace not found"
+        )
+
     return workspace.members
 
 
 @router.patch("/members/add/{workspace_id}/{user_id}", response_model=WorkspaceResponse)
 def add_user(
-        workspace_id: int,
-        user_id: int,
-        current_user: Annotated[WorkspaceMember, Depends(require_admin)],
-        db: Annotated[Session, Depends(get_db)]
+    user_id      : int,
+    workspace_id : int,
+    db           : Annotated[Session, Depends(get_db)],
+    current_user : Annotated[WorkspaceMember, Depends(require_admin)],
 ):
-    target_user = db.execute(select(User).where(User.id == user_id)).scalars().first()
-
-    if not target_user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-
     is_member = get_target_membership(workspace_id, user_id, db)
 
     if is_member:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already in the workspace")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail="User already in the workspace"
+        )
 
-    new_member = WorkspaceMember(
-        user_id=target_user.id,
-        workspace_id=workspace_id
-    )
+    new_member = WorkspaceMember(user_id=user_id, workspace_id=workspace_id)
     db.add(new_member)
     db.commit()
 
-    workspace = db.execute(select(Workspace).where(Workspace.id == workspace_id)).scalars().first()
+    workspace = (
+        db.execute(select(Workspace).where(Workspace.id == workspace_id))
+        .scalars()
+        .first()
+    )
+
     return workspace
 
 
 @router.patch("/members/remove/{workspace_id}/{user_id}", response_model=WorkspaceResponse)
 def remove_user(
-        workspace_id : int,
-        user_id      : int,
-        current_user : Annotated[WorkspaceMember, Depends(require_admin)],
-        db           : Annotated[Session, Depends(get_db)]
+    workspace_id : int,
+    user_id      : int,
+    db           : Annotated[Session, Depends(get_db)],
+    current_user : Annotated[WorkspaceMember, Depends(require_admin)],
 ):
     member = get_target_membership(workspace_id, user_id, db)
+
     if not member:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is not a member of this workspace")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User is not a member of this workspace",
+        )
+
     db.delete(member)
     db.commit()
 
-    workspace = db.execute(select(Workspace).where(Workspace.id == workspace_id)).scalars().first()
+    workspace = (
+        db.execute(select(Workspace).where(Workspace.id == workspace_id))
+        .scalars()
+        .first()
+    )
+
     return workspace
 
 
 @router.patch("/members/make-admin/{workspace_id}/{user_id}", response_model=WorkspaceResponse)
 def make_admin(
-        workspace_id : int,
-        user_id      : int,
-        current_user : Annotated[WorkspaceMember, Depends(require_admin)],
-        db           : Annotated[Session, Depends(get_db)]
+    workspace_id : int,
+    user_id      : int,
+    db           : Annotated[Session, Depends(get_db)],
+    current_user : Annotated[WorkspaceMember, Depends(require_admin)],
 ):
     member = get_target_membership(workspace_id, user_id, db)
-    if not member:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is not a member of this workspace")
 
-    workspace = db.execute(select(Workspace).where(Workspace.id == workspace_id)).scalars().first()
+    if not member:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User is not a member of this workspace",
+        )
+
+    workspace = (
+        db.execute(select(Workspace).where(Workspace.id == workspace_id))
+        .scalars()
+        .first()
+    )
+
     if member.role == "admin":
         return workspace
 
     member.role = "admin"
     db.commit()
+
     return workspace
 
 
+@router.patch("/me/{workspace_id}", status_code=status.HTTP_204_NO_CONTENT)
+def leave_workspace(
+    workspace_id : int,
+    db           : Annotated[Session, Depends(get_db)],
+    membership   : Annotated[WorkspaceMember, Depends(require_membership)],
+):
+    if membership.role == "admin" :
+        admin_count = db.execute(
+            select(func.count()).where(
+                WorkspaceMember.workspace_id == membership.workspace_id,
+                WorkspaceMember.role == "admin"
+            )
+        ).scalar()
+
+        if admin_count == 1 :
+            raise HTTPException(
+                status_code = status.HTTP_400_BAD_REQUEST, 
+                detail = "Cannot leave as the last admin, promote someone first"
+            )
+
+    db.delete(membership)
+    db.commit()
+
+    member_count = db.execute(
+        select(func.count()).where(
+            WorkspaceMember.workspace_id == workspace_id
+        )
+    ).scalar()
+    
+    if member_count == 0:
+        workspace = db.execute(
+            select(Workspace).where(Workspace.id == workspace_id)
+        ).scalars().first()
+        
+        db.delete(workspace)
+        db.commit()
+            
+    
 @router.patch("/{workspace_id}", response_model=WorkspaceResponse)
 def update_workspace_partial(
-        workspace_id: int,
-        current_user: Annotated[WorkspaceMember, Depends(require_membership)],
-        workspace_data: WorkspaceUpdate,
-        db: Annotated[Session, Depends(get_db)]
+    workspace_id   : int,
+    workspace_data : WorkspaceUpdate,
+    db             : Annotated[Session, Depends(get_db)],
+    current_user   : Annotated[WorkspaceMember, Depends(require_membership)],
 ):
-    workspace = db.execute(select(Workspace).where(Workspace.id == workspace_id)).scalars().first()
+    workspace = (
+        db.execute(select(Workspace).where(Workspace.id == workspace_id))
+        .scalars()
+        .first()
+    )
 
     update = workspace_data.model_dump(exclude_unset=True)
     for field, value in update.items():
@@ -168,17 +247,25 @@ def update_workspace_partial(
 
 @router.put("/{workspace_id}/", response_model=WorkspaceResponse)
 def update_workspace_full(
-        workspace_id: int,
-        current_user: Annotated[WorkspaceMember, Depends(require_membership)],
-        workspace_data: WorkspaceCreate,
-        db: Annotated[Session, Depends(get_db)]
+    workspace_id   : int,
+    workspace_data : WorkspaceCreate,
+    db             : Annotated[Session, Depends(get_db)],
+    current_user   : Annotated[WorkspaceMember, Depends(require_membership)], 
 ):
-    workspace = db.execute(select(Workspace).where(Workspace.id == workspace_id)).scalars().first()
+    workspace = (
+        db.execute(select(Workspace).where(Workspace.id == workspace_id))
+        .scalars()
+        .first()
+    )
 
-    workspace.title = workspace_data.title
-    workspace.description = workspace_data.description
-    workspace.max_number = workspace_data.max_number
-    workspace.due_date = workspace_data.due_date
+    if not workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found"
+        )
+
+    update = workspace_data.model_dump()
+    for field, value in update.items():
+        setattr(workspace, field, value)
 
     db.commit()
     db.refresh(workspace)
@@ -187,10 +274,21 @@ def update_workspace_full(
 
 @router.delete("/{workspace_id}/", status_code=status.HTTP_204_NO_CONTENT)
 def delete_workspace(
-        workspace_id: int,
-        admin : Annotated[WorkspaceMember, Depends(require_admin)],
-        db: Annotated[Session, Depends(get_db)]
+    workspace_id : int,
+    db           : Annotated[Session, Depends(get_db)],
+    admin        : Annotated[WorkspaceMember, Depends(require_admin)],
 ):
-    workspace = db.execute(select(Workspace).where(Workspace.id == workspace_id)).scalars().first()
+    workspace = (
+        db.execute(select(Workspace).where(Workspace.id == workspace_id))
+        .scalars()
+        .first()
+    )
+
+    if not workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Workspace not found"
+        )
+
     db.delete(workspace)
     db.commit()

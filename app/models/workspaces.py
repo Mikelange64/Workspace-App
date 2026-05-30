@@ -1,4 +1,4 @@
-from datetime import datetime, UTC
+from datetime import datetime, UTC, timedelta
 from sqlalchemy import String, Integer, DateTime, ForeignKey, Text, Boolean, Table, Column
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -46,3 +46,19 @@ class Workspace(Base):
     @property
     def num_of_tasks(self) -> int:
         return len(self.tasks)
+
+    @property
+    def progress(self) -> float:
+        if not self.tasks : 
+            return 0.0
+            
+        completed = [t for t in self.tasks if t.is_completed]
+        return (len(completed)/len(self.tasks)) * 100
+    
+    @property
+    def time_remaining(self) -> timedelta | None :
+        if self.due_date is None :
+            return None
+    
+        return self.due_date - datetime.now()
+        

@@ -45,7 +45,7 @@ def create_access_token(data: dict, expired_delta: timedelta | None = None) -> s
     return encode_jwt
 
 
-def verify_access_token(token: str) -> bool | str:
+def verify_access_token(token: str) -> bool | str | None:
     try:
         payload = jwt.decode(
             token,
@@ -53,15 +53,15 @@ def verify_access_token(token: str) -> bool | str:
             algorithms=["HS256"],
             option={"require" : ["exp", "sub"]}
         )
-    except:
+    except ValueError:
         return False
     else:
         return payload.get("sub")
 
 
 def get_current_user(
-        token: Annotated[str, Depends(oauth2_scheme)],
-        db : Annotated[Session, Depends(get_db)]
+        token : Annotated[str, Depends(oauth2_scheme)],
+        db    : Annotated[Session, Depends(get_db)]
 ):
     user_id = verify_access_token(token)
 
@@ -90,7 +90,7 @@ def get_current_user(
             detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
         )
-
+        
     return user
 
 

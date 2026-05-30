@@ -1,7 +1,7 @@
 from __future__ import annotations
 from datetime import datetime, UTC
 
-from sqlalchemy import String, Integer, Boolean, ForeignKey, DateTime
+from sqlalchemy import String, Integer, Boolean, DateTime, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -15,13 +15,27 @@ class User(Base) :
     email         : Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
     password_hash : Mapped[str] = mapped_column(String(100), nullable=False)
     is_superuser  : Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    image_path    : Mapped[str | None] = mapped_column(String(100), nullable=True, default=None)
+    image_path    : Mapped[str | None] = mapped_column(String(100), default=None)
+    last_login    : Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    joined_at     : Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default = lambda : datetime.now(UTC),
+        server_default = text("now()"),
+        nullable = False
+    )
 
     created_tasks : Mapped[list["Task"]] = relationship(
         "Task",
+        foreign_keys = "[Task.creator_id]",
         back_populates="creator",
+    ) 
+    owned_tasks : Mapped[list["Task"]] = relationship(
+        "Task",
+        foreign_keys = "[Task.owner_id]",
+        back_populates="owner"
+        
     )
-    workspaces : Mapped[list["Workspace"]] = relationship(
+    workspaces : Mapped[list["Workspace"]] = relationship(  
         secondary="workspace_member",
         back_populates="members",
         viewonly=True,

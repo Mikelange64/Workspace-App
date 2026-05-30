@@ -7,10 +7,11 @@ class Base(BaseModel):
 
 
 class TaskBase(BaseModel):
-    title     : str = Field(min_length=1, max_length=100)
-    content   : str = Field(min_length=1, max_length=300)
-    workspace_id : int | None = None
-    due_date  : datetime | None = None
+    title        : str = Field(min_length=1, max_length=100)
+    content      : str = Field(min_length=1, max_length=300)
+    workspace_id : int
+    creator_id   : int
+    due_date     : datetime | None = None
 
 
 class TaskCreate(TaskBase):
@@ -29,12 +30,12 @@ class TaskResponse(TaskBase):
 
 
 class TaskUpdate(TaskBase):
-    title            : str | None = None
+    title        : str | None = None
     content      : str | None = Field(default=None, min_length=1, max_length=300)
     workspace_id : int | None = None
-    is_completed : bool | None = None
     due_date     : datetime | None = None
 
 
 class TaskMove(BaseModel):
-    workspace_id : int | None
+    workspace_id : int
+    

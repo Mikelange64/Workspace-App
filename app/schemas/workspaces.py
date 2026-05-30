@@ -9,7 +9,6 @@ class Base(BaseModel):
 
 
 class WorkspaceBase(BaseModel):
-    admin_id    : int
     title       : str = Field(min_length=1, max_length=50)
     description : str = Field(min_length=1, max_length=500)
     max_number  : int | None = None

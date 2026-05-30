@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -9,22 +9,26 @@ from sqlalchemy.orm import Session
 from app.auth import CurrentUser, create_access_token, hash_password, verify_password
 from app.config import settings
 from app.database import get_db
-from app.models import User, Workspace
-from app.schemas.users import (
+from app.models import User, Workspace, WorkspaceMember
+from app.schemas import (
     ChangePassword,
     Token,
     UserCreate,
     UserPrivate,
     UserPublic,
     UserUpdate,
+    WorkspaceResponse,
 )
-from app.schemas.workspaces import WorkspaceResponse
+from app.utility import require_membership
 
 router = APIRouter()
 
 
 @router.post("", response_model=UserPrivate, status_code=status.HTTP_201_CREATED)
-def create_user(user: UserCreate, db: Annotated[Session, Depends(get_db)]):
+def create_user(
+    user: UserCreate, 
+    db: Annotated[Session, Depends(get_db)]
+):
     email_exists = (
         db.execute(select(User).where(func.lower(User.email) == user.email.lower()))
         .scalars()
@@ -56,8 +60,8 @@ def create_user(user: UserCreate, db: Annotated[Session, Depends(get_db)]):
 
 @router.post("/login", response_model=Token)
 def login(
-    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
-    db: Annotated[Session, Depends(get_db)],
+    db        : Annotated[Session, Depends(get_db)],
+    form_data : Annotated[OAuth2PasswordRequestForm, Depends()],
 ):
     # here we use the form data username field to accept either email or username, so the user has a choice
     email_or_username = form_data.username.lower()
@@ -87,6 +91,9 @@ def login(
         expired_delta=access_token_expires,
     )
 
+    user.last_login = datetime.now(UTC)
+    db.commit()
+
     return Token(access_token=access_token, token_type="bearer")
 
 
@@ -96,9 +103,10 @@ def get_current_user(user: CurrentUser):
 
 
 @router.get("/{user_id}", response_model=UserPublic)
-def get_user(user_id: int, db: Annotated[Session, Depends(get_db)]):
-    result = db.execute(select(User).where(User.id == user_id))
-    user = result.scalars().first()
+def get_user(
+    user_id: int, db: Annotated[Session, Depends(get_db)]
+):
+    user = db.execute(select(User).where(User.id == user_id)).scalars().first()
 
     if not user:
         raise HTTPException(
@@ -112,27 +120,40 @@ def get_user(user_id: int, db: Annotated[Session, Depends(get_db)]):
 def get_user_workspaces(
     current_user: CurrentUser, db: Annotated[Session, Depends(get_db)]
 ):
-    workspace = (
-        db.execute(select(Workspace).where(Workspace.admin_id == current_user.id))
+    workspaces = (
+        db.execute(
+            select(Workspace)
+            .join(WorkspaceMember, WorkspaceMember.workspace_id == Workspace.id)
+            .where(WorkspaceMember.user_id == current_user.id)
+        )
         .scalars()
         .all()
     )
-    return workspace
+
+    if not workspaces:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User has no workspaces"
+        )
+
+    return workspaces
 
 
 @router.patch("/me", response_model=UserPrivate)
 def update_user(
-    current_user: CurrentUser,
-    user_data: UserUpdate,
-    db: Annotated[Session, Depends(get_db)],
+    current_user : CurrentUser,
+    user_data    : UserUpdate,
+    db           : Annotated[Session, Depends(get_db)],
 ):
     # checks if the user updated their username (not blank or some as before) and if the new username is already taken
     if (
         user_data.username is not None
         and user_data.username.lower() != current_user.username.lower()
     ):
-        result = db.execute(select(User).where(User.username == user_data.username))
-        existing_username = result.scalars().first()
+        existing_username = (
+            db.execute(select(User).where(User.username == user_data.username))
+            .scalars()
+            .first()
+        )
 
         if existing_username:
             raise HTTPException(
@@ -145,16 +166,16 @@ def update_user(
         user_data.email is not None
         and user_data.email.lower() != current_user.email.lower()
     ):
-        result = db.execute(select(User).where(User.email == user_data.email))
-        existing_email = result.scalars().first()
+        existing_email = (
+            db.execute(select(User).where(User.email == user_data.email))
+            .scalars()
+            .first()
+        )
 
         if existing_email:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT, detail="Email already registered"
             )
-
-    if user_data.username:
-        user_data.username = user_data.username.lower()
 
     if user_data.email:
         user_data.email = user_data.email.lower()
@@ -162,6 +183,7 @@ def update_user(
     update = user_data.model_dump(exclude_unset=True)
     for field, value in update.items():
         setattr(current_user, field, value)
+
     db.commit()
     db.refresh(current_user)
     return current_user
@@ -169,9 +191,9 @@ def update_user(
 
 @router.patch("me/change-password", response_model=UserPrivate)
 def change_password(
-    current_user: CurrentUser,
-    password_data: ChangePassword,
-    db: Annotated[Session, Depends(get_db)],
+    current_user  : CurrentUser,
+    password_data : ChangePassword,
+    db            : Annotated[Session, Depends(get_db)],
 ):
     if not verify_password(password_data.old_password, current_user.password_hash):
         raise HTTPException(
@@ -194,6 +216,8 @@ def change_password(
 
 
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
-def delete_user(current_user: CurrentUser, db: Annotated[Session, Depends(get_db)]):
+def delete_user(
+    current_user: CurrentUser, db: Annotated[Session, Depends(get_db)]
+):
     db.delete(current_user)
     db.commit()

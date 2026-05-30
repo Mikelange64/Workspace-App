@@ -1,7 +1,9 @@
 [project]
-name = "noteapp"
+name = "WorkspaceApp"
 version = "0.1.0"
-description = "Add your description here"
+description = '''A collaborative platform where users can create workspaces dedicated to completing specific projects.
+Users can create tasks, set deadlines, and track completion rate in a free environment with a loose hierarchy.
+Meant for small projects like planning a trip, or larger projects involving multiple people.'''
 requires-python = ">=3.14"
 dependencies = [
     "alembic>=1.18.4",

@@ -1,23 +1,19 @@
-from fastapi import FastAPI, HTTPException, Request, status, Depends
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
-from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
-
-from starlette.exceptions import HTTPException
-
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
-
 from typing import Annotated
 
-from app.database import engine, get_db, Base
-from app.models.users import User
-from app.models.tasks import Task
-from app.routers import users, tasks, workspaces
-from app.admin import admin_users
+from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+from starlette.exceptions import HTTPException
 
+from app.admin import admin_users
+from app.database import Base, engine, get_db
+from app.models.tasks import Task
+from app.models.users import User
+from app.routers import tasks, users, workspaces
 
 Base.metadata.create_all(bind=engine)
 app = FastAPI()
@@ -26,8 +22,8 @@ templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="templates"), name="static")
 app.mount("/media", StaticFiles(directory="templates"), name="static")
 
-app.include_router(users.router, prefix="/api/user", tags=["user"])
-app.include_router(tasks.router, prefix="/api/task", tags=["task"])
+app.include_router(users.router, prefix="/api/users", tags=["user"])
+app.include_router(tasks.router, prefix="/api/tasks", tags=["task"])
 app.include_router(workspaces.router, prefix="/api/workspaces", tags=["workspaces"])
 app.include_router(admin_users.router, prefix="/api/admin-users", tags=["admin_users"])
 
@@ -40,21 +36,22 @@ def home(request: Request, user_id: int, db: Annotated[Session, Depends(get_db)]
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    result = db.execute(select(Task).where(Task.user_id == user.id, Task.is_completed == False))
+    result = db.execute(
+        select(Task).where(Task.user_id == user.id, Task.is_completed == False)
+    )
     pending_tasks = result.scalars().all()
 
     return templates.TemplateResponse(
         request=request,
         name="pending.html",
-        context={"pending_tasks": pending_tasks, "title" : "Home"},
+        context={"pending_tasks": pending_tasks, "title": "Home"},
     )
-
-
 
 
 # ======================================================================================================================
 # EXCEPTION HANDLER
 # ======================================================================================================================
+
 
 @app.exception_handler(HTTPException)
 def general_exception_handler(request: Request, exc: HTTPException):
@@ -62,18 +59,15 @@ def general_exception_handler(request: Request, exc: HTTPException):
     message = exc.detail if exc.detail else "An error occurred, please try again"
 
     if request.url.path.startswith("/api"):
-        return JSONResponse(
-            status_code=exc.status_code,
-            content={"message" : message}
-        )
+        return JSONResponse(status_code=exc.status_code, content={"message": message})
 
     return templates.TemplateResponse(
         request=request,
         name="error.html",
         context={
-            "status_code" : exc.status_code,
-            "message"     : message,
-            "title" : exc.status_code
+            "status_code": exc.status_code,
+            "message": message,
+            "title": exc.status_code,
         },
     )
 
@@ -83,16 +77,15 @@ def validation_exception_handler(request: Request, exc: RequestValidationError):
     if request.url.path.startswith("/api"):
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            content={"message": exc.errors()}
+            content={"message": exc.errors()},
         )
 
     return templates.TemplateResponse(
         request=request,
         name="error.html",
-        context = {
-            "status_code" : status.HTTP_422_UNPROCESSABLE_CONTENT,
-            "title"       : status.HTTP_422_UNPROCESSABLE_CONTENT,
-            "message"     : "Invalid request, please check your input and try again",
-        }
+        context={
+            "status_code": status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "title": status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "message": "Invalid request, please check your input and try again",
+        },
     )
-

@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
+from datetime import datetime
 
 
 class Base(BaseModel):
@@ -7,7 +8,7 @@ class Base(BaseModel):
 
 class UserBase(Base):
     username : str   = Field(min_length=5, max_length=50)
-    email : EmailStr = Field(max_length=120)
+    email    : EmailStr = Field(max_length=120)
 
 
 class UserCreate(UserBase):
@@ -16,21 +17,27 @@ class UserCreate(UserBase):
 
 class UserPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
-    id         : int
+    
     username   : str
     image_path : str | None = None
+    joined_at  : datetime
 
 
 class UserPrivate(UserPublic):
-    email : EmailStr
+    id         : int
+    email      : EmailStr
+    last_login : datetime | None
+    
+    
+class SuperUserResponse(UserPrivate):
+    is_superuser : bool
 
 
 class UserUpdate(UserBase):
-    username   : str | None = Field(default=None, min_length=5, max_length=50)
+    username   : str | None      = Field(default=None, min_length=5, max_length=50)
     email      : EmailStr | None = Field(default=None,  max_length=120)
-    image_path : str | None = None
-
+    image_path : str | None      = None
+    
 
 class ChangePassword(BaseModel):
     old_password : str
@@ -38,5 +45,5 @@ class ChangePassword(BaseModel):
 
 
 class Token(BaseModel):
-    access_token: str
-    token_type: str
+    access_token : str
+    token_type   : str
