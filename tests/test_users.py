@@ -281,8 +281,8 @@ def test_get_user_workspaces_multiple(
 def test_get_user_workspaces_no_workspaces(client: TestClient, user_auth_headers):
     response = client.get(f"{prefix}/me/workspaces", headers=user_auth_headers)
 
-    assert response.status_code == 404
-    assert response.json()["message"] == "User has no workspaces"
+    assert response.status_code == 200
+    assert response.json() == []
 
 
 def test_get_user_workspaces_no_auth(client: TestClient):

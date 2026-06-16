@@ -1,7 +1,12 @@
 import os
+from io import BytesIO
+from pathlib import Path
 
+import boto3
 import pytest
 from fastapi.testclient import TestClient
+from moto import mock_aws
+from PIL import Image
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -9,6 +14,20 @@ os.environ["DATABASE_URL"] = (
     "postgresql+psycopg://mikelange64@localhost/test_workspaceapp"
 )
 os.environ["SECRET_KEY"] = "test-secret-key-for-testing-only"
+os.environ["S3_BUCKET_NAME"] = "test-bucket"
+os.environ["S3_ACCESS_KEY_ID"] = "testing"
+os.environ["S3_SECRET_ACCESS_KEY"] = "testing"
+os.environ["S3_REGION"] = "us-east-2"
+os.environ["AWS_ACCESS_KEY_ID"] = "testing"
+os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
+os.environ["AWS_DEFAULT_REGION"] = "us-east-2"
+os.environ["MAIL_HOST"] = "localhost"
+os.environ["MAIL_PORT"] = "587"
+os.environ["MAIL_USERNAME"] = ""
+os.environ["MAIL_PASSWORD"] = ""
+os.environ["MAIL_FROM"] = "test@example.com"
+os.environ["MAIL_USE_TLS"] = "False"
+os.environ["FRONTEND_URL"] = "http://localhost:3000"
 
 from app.database import Base, get_db
 from app.main import app
@@ -101,3 +120,24 @@ def second_user(client):
 def second_user_token(client, second_user):
     """Return a valid auth token for the second user."""
     return login_user(client, email="user2@example.com")
+
+
+@pytest.fixture
+def mocked_s3():
+    """Create an in-memory mock S3 bucket for testing."""
+    with mock_aws():
+        s3 = boto3.client("s3", region_name=os.environ["S3_REGION"])
+        s3.create_bucket(
+            Bucket=os.environ["S3_BUCKET_NAME"],
+            CreateBucketConfiguration={"LocationConstraint": os.environ["S3_REGION"]},
+        )
+        yield s3
+
+
+@pytest.fixture
+def test_image() -> bytes:
+    """Generate a small valid JPEG image in memory."""
+    img = Image.new("RGB", (100, 100), color="red")
+    buf = BytesIO()
+    img.save(buf, "JPEG")
+    return buf.getvalue()

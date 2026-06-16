@@ -178,7 +178,10 @@ def test_get_tasks_empty(client: TestClient, user_auth_headers, workspace):
         f"{taskprefix}/{workspace['id']}/tasks/", headers=user_auth_headers
     )
     assert response.status_code == 200
-    assert response.json() == []
+    data = response.json()
+    assert data["tasks"] == []
+    assert data["total"] == 0
+    assert data["has_more"] is False
 
 
 def test_get_tasks_multiple(
@@ -191,8 +194,8 @@ def test_get_tasks_multiple(
     )
     assert response.status_code == 200
     data = response.json()
-    assert len(data) == 2
-    assert {t["title"] for t in data} == {"Task One", "Task Two"}
+    assert len(data["tasks"]) == 2
+    assert {t["title"] for t in data["tasks"]} == {"Task One", "Task Two"}
 
 
 @pytest.mark.parametrize(
@@ -697,12 +700,12 @@ def test_move_task_verified(
     response = client.get(
         f"{taskprefix}/{workspace_b['id']}/tasks/", headers=user_auth_headers
     )
-    assert any(t["id"] == task["id"] for t in response.json())
+    assert any(t["id"] == task["id"] for t in response.json()["tasks"])
     # Task should no longer be in workspace_a's task list
     response = client.get(
         f"{taskprefix}/{workspace['id']}/tasks/", headers=user_auth_headers
     )
-    assert not any(t["id"] == task["id"] for t in response.json())
+    assert not any(t["id"] == task["id"] for t in response.json()["tasks"])
 
 
 @pytest.mark.parametrize(

@@ -20,5 +20,6 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "moto>=5.2.2",
     "pytest>=9.0.3",
 ]
