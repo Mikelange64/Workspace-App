@@ -1,12 +1,14 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select, func
 
 from app.database import DbSession
 from app.models import User
 from app.schemas import SuperUserResponse, PaginatedSuperUserResponse
-from app.utility import require_superuser, get_user_by_id
+from app.dependencies import require_superuser
+from app.utils import get_user_by_id
+
 
 router = APIRouter()
 
@@ -31,7 +33,7 @@ def get_all_users(
 
     has_more = skip + len(users) < total
 
-    response = PaginatedSuperuserResponse(
+    response = PaginatedSuperUserResponse(
         users    = [SuperUserResponse.model_validate(u) for u in users],
         total    = total,
         skip     = skip,

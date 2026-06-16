@@ -11,7 +11,7 @@ from starlette.exceptions import HTTPException
 
 from app.auth import CurrentUser
 from app.admin import admin_users
-from app.database import get_db
+from app.database import DbSession
 from app.models import Task, User, Workspace, WorkspaceMember
 from app.routers import tasks, users, workspaces
 
@@ -28,12 +28,17 @@ app.include_router(admin_users.router, prefix="/api/admin-users", tags=["admin_u
 
 
 @app.get("", include_in_schema=False)
-def home(request: Request, current_user: CurrentUser, db: Annotated[Session, Depends(get_db)]):
+def home(request: Request, current_user: CurrentUser, db: DbSession):
     pending_workspaces = (
         db.execute(
             select(Workspace)
             .join(WorkspaceMember, WorkspaceMember.workspace_id == Workspace.id)
-            .where(WorkspaceMember.user_id == current_user.id, Workspace.progress == 100)
+            .join(Task, Task.workspace_id == Workspace.id)
+            .where(
+                WorkspaceMember.user_id == current_user.id,
+                Task.is_completed == False
+            )
+            .distinct()  # prevent duplicate workspaces if multiple incomplete tasks
         )
         .scalars()
         .all()

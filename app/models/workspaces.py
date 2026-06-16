@@ -1,13 +1,10 @@
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import (
-    Boolean,
-    Column,
     DateTime,
     ForeignKey,
     Integer,
     String,
-    Table,
     Text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -16,10 +13,10 @@ from app.database import Base
 
 
 class Workspace(Base):
-    __tablename__ = "workspace"
+    __tablename__ = "workspaces"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    creator_id: Mapped[int] = mapped_column(Integer, ForeignKey("user.id"))
+    creator_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"))
     title: Mapped[str] = mapped_column(String(50), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     max_number: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)

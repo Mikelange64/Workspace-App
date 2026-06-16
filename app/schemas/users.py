@@ -45,13 +45,3 @@ class UserUpdate(UserBase):
     username   : str | None      = Field(default=None, min_length=5, max_length=50)
     email      : EmailStr | None = Field(default=None,  max_length=120)
     image_path : str | None      = None
-    
-
-class ChangePassword(BaseModel):
-    old_password : str
-    new_password : str
-
-
-class Token(BaseModel):
-    access_token : str
-    token_type   : str

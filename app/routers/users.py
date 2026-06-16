@@ -1,16 +1,27 @@
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from PIL import UnidentifiedImageError
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func, or_, select
+from sqlalchemy import delete as sql_delete
 
-from app.auth import CurrentUser, create_access_token, hash_password, verify_password
+from app.auth import (
+    CurrentUser, 
+    create_access_token, 
+    hash_password, 
+    verify_password, 
+    generate_reset_tokens, 
+    hash_reset_token
+)
 from app.config import settings
 from app.database import DbSession
-from app.models import User, Workspace, WorkspaceMember
+from app.models import User, Workspace, WorkspaceMember, PasswordResetToken
 from app.schemas import (
-    ChangePassword,
+    ChangePasswordRequest,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
     Token,
     UserCreate,
     UserPrivate,
@@ -18,9 +29,18 @@ from app.schemas import (
     UserUpdate,
     WorkspaceResponse,
 )
-from app.utility import get_user_by_id
+from app.utils import (
+    delete_profile_image,
+    get_user_by_id, 
+    process_profile_image,
+    upload_profile_image, 
+    send_password_reset_email
+)
+
+from botocore.exceptions import ClientError
 
 router = APIRouter(tags=["users"])
+
 
 # =======================================================================================
 # CRUD ON USERS
@@ -71,8 +91,7 @@ def login(
                 )
             )
         )
-        .scalars()
-        .first()
+        .scalars().first()
     )
 
     if not user or not verify_password(form_data.password, user.password_hash):
@@ -146,10 +165,136 @@ def update_user(current_user: CurrentUser, user_data: UserUpdate, db: DbSession)
 
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(current_user: CurrentUser, db: DbSession):
+    old_filename = current_user.image_path
+
     db.delete(current_user)
     db.commit()
 
+    if old_filename:
+       delete_profile_image(old_filename)    
 
+
+# ========================================================================================
+# PASSWORD RESET
+# ========================================================================================
+
+
+@router.post("/forgot-password", status_code=status.HTTP_202_ACCEPTED)
+def forgot_password(
+    db               : DbSession,
+    request_data     : ForgotPasswordRequest,
+    background_tasks : BackgroundTasks,
+):
+    user = (
+        db.execute(select(User)
+        .where(func.lower(User.email) == request_data.email.lower()))
+        .scalars().first()
+    )
+
+    if user:
+        # delete existing reset tokens for security
+        db.execute(
+            sql_delete(PasswordResetToken).where(PasswordResetToken.user_id == user.id)
+        )
+
+        token      = generate_reset_tokens()
+        token_hash = hash_reset_token(token)
+        expires_at = datetime.now(UTC) + timedelta(settings.reset_token_expire_minutes)
+
+        reset_token = PasswordResetToken(
+            user_id=user.id, token_hash=token_hash, expires_at=expires_at
+        )
+
+        db.add(reset_token)
+        db.commit()
+
+        # we send the unhashed token to the user
+        background_tasks.add_task(
+            send_password_reset_email,
+            to_email=user.email,
+            username=user.username,
+            token=token,
+        )
+
+    # for security reasons we don't reveal if the user exists (protect from email enumeration attacks)
+    return {
+        "message": "If an account exists with this email, you wil recieve password reset instructions"
+    }
+
+
+@router.post("/resert-password")
+def reset_password(
+    request_data: ResetPasswordRequest, db: DbSession
+):
+    token_hash = hash_reset_token(request_data.token)
+
+    reset_token = (
+        db.execute(select(PasswordResetToken)
+        .where(PasswordResetToken.token_hash == token_hash))
+        .scalars().first()
+    )
+    
+    # if the token doesn't exist
+    if not reset_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token",
+        )
+
+    # if the token is expired
+    if reset_token.expires_at < datetime.now(UTC):
+        db.delete(reset_token)
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token",
+        )
+
+    user = (
+        db.execute(select(User).where(User.id == reset_token.user_id))
+        .scalars().first()
+    )
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token",
+        )
+
+    user.password_hash = hash_password(request_data.new_password)
+
+    db.execute(
+        sql_delete(PasswordResetToken).where(PasswordResetToken.user_id == user.id),
+    )
+    db.commit()
+
+    return {"message": "Password changed successfully"}
+
+
+@router.patch("/me/password")
+def change_password(
+    current_user: CurrentUser,
+    password_data: ChangePasswordRequest,
+    db: DbSession
+):
+    if not verify_password(password_data.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_FORBIDDEN,
+            detail="current password is incorrect",
+        )
+
+    new_password_hash = hash_password(password_data.new_password)
+    current_user.password_hash = new_password_hash
+
+    db.execute(
+        sql_delete(PasswordResetToken)
+        .where(PasswordResetToken.user_id == current_user.id)
+    )
+
+    db.commit()
+    return {"message": "Password changed successfully"}
+
+    
 # ========================================================================================
 # OPERATIOS ON SUBRESOURCES
 # ========================================================================================
@@ -173,37 +318,61 @@ def get_user(user_id: int, db: DbSession):
     return user
 
 
-@router.patch("me/change-password", response_model=UserPrivate)
-def change_password(
-    current_user: CurrentUser, password_data: ChangePassword, db: DbSession,
+@router.patch("/me/picture", response_model=UserPrivate)
+def upload_profile_picture(
+    file: UploadFile, current_user: CurrentUser, db: DbSession
 ):
-    if not verify_password(password_data.old_password, current_user.password_hash):
+    content = file.file.read()  # file.file because the app is sync
+
+    if len(content) > settings.max_upload_size_bytes:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Incorrect password"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"File too large. Maximum size is {settings.max_upload_size_bytes // (1024 * 1024)}MB",
         )
 
-    if verify_password(password_data.new_password, current_user.password_hash):
+    try:
+        processed_bytes, new_filename = process_profile_image(content)
+    except UnidentifiedImageError as err:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="New password must be different to the old password",
-        )
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid image file. Please uplaod a valid image(JPEG, PNG, GIF, WebP).",
+        ) from err
 
-    new_hashed_password = hash_password(password_data.new_password)
-    current_user.password_hash = new_hashed_password
+    try:
+        upload_profile_image(processed_bytes, new_filename)
+    except ClientError as err:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to upload image. Please try again",
+        ) from err
+
+    old_filename = current_user.image_path  # store the old filename
+    current_user.image_path = new_filename
 
     db.commit()
     db.refresh(current_user)
 
+    if old_filename:
+        delete_profile_image(old_filename)
+
     return current_user
 
 
-# @router.post("/{user_id}/picture", response_model = UserPrivate)
-# async def upload_profile_picture(
-#     user_id : int,
-#     file : UploadFile,
-#     current_user: CurrentUser,
-#     db : DbSession
-# ):
-#     # broswer send picture as content-type : "multi-part form data" which fast api handles with UploadFile
-#     if current_user.id != user_id :
+@router.delete("/me/picture", response_model=UserPrivate)
+def delete_profile_picture(
+    current_user: CurrentUser, db: DbSession,
+):
+    old_filename = current_user.image_path
+
+    if old_filename is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No profile picture to delete",
+        )
+
+    current_user.image_path = None
+    db.commit()
+    db.refresh(current_user)
+
+    delete_profile_image(old_filename)
+    return current_user

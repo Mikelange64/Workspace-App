@@ -2,6 +2,7 @@ from sqlalchemy import select
 from app.database import SessionLocal
 from app.models import User
 
+
 def promote_user(username: str):
     with SessionLocal() as db:
         stmt = select(User).where(User.username == username)
@@ -14,6 +15,7 @@ def promote_user(username: str):
         user.is_superuser = True
         db.commit()
         print(f"Success! {username} is now a superuser.")
+
 
 if __name__ == "__main__":
     import sys

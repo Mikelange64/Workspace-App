@@ -10,10 +10,10 @@ class WorkspaceMember(Base):
     __tablename__ = "workspace_member"
 
     user_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("user.id"), primary_key=True
+        Integer, ForeignKey("users.id"), primary_key=True
     )
     workspace_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("workspace.id", ondelete="CASCADE"), primary_key=True
+        Integer, ForeignKey("workspaces.id", ondelete="CASCADE"), primary_key=True
     )
     role: Mapped[str] = mapped_column(String(50), nullable=False, default="member")
     joined_at: Mapped[datetime] = mapped_column(

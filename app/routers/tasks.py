@@ -13,14 +13,13 @@ from app.schemas import (
     WorkspaceResponse,
     PaginatedTaskResponse
 )
-from app.utility import (
+from app.dependencies import (
     get_target_membership,
-    get_task_by_id,
-    get_user_by_id,
-    get_workspace_by_id,
     require_admin,
     require_membership,
 )
+from app.utils import get_task_by_id, get_user_by_id, get_workspace_by_id
+
 
 router = APIRouter(prefix="/{workspace_id}/tasks", tags=["tasks"])
 

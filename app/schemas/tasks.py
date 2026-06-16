@@ -26,7 +26,7 @@ class TaskResponse(TaskBase):
     id: int
     is_completed: bool
     date_created: datetime
-    due_date: datetime | None 
+    due_date: datetime | None
 
 
 class PaginatedTaskResponse(Base) :

@@ -2,18 +2,23 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 import jwt
+import hashlib
+import secrets
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from pwdlib import PasswordHash
 from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.database import get_db
+from app.database import DbSession
 from app.models.users import User
 
 pw_hasher = PasswordHash.recommended()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/users/login")
+
+
+# =================================== JWT ACCESS TOKEN ===================================
 
 
 def hash_password(password: str) -> str:
@@ -59,8 +64,7 @@ def verify_access_token(token: str) -> bool | str | None:
 
 
 def get_current_user(
-    token: Annotated[str, Depends(oauth2_scheme)],
-    db: Annotated[Session, Depends(get_db)],
+    token: Annotated[str, Depends(oauth2_scheme)], db: DbSession,
 ):
     user_id = verify_access_token(token)
 
@@ -94,3 +98,15 @@ def get_current_user(
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+# ================================= PASSWORD RESET TOKEN =================================
+
+# url safe base 64 characters
+def generate_reset_tokens() -> str:
+    return secrets.token_urlsafe(32)
+
+
+# SHA256 instead of argon2, tokens are longer and harder to brute force
+def hash_reset_token(token: str) -> str :
+   return hashlib.sha256(token.encode()).hexdigest()

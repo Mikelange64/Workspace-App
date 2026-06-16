@@ -6,7 +6,8 @@ from sqlalchemy.orm import joinedload
 
 from app.auth import CurrentUser
 from app.database import DbSession
-from app.utility import get_target_membership, require_admin, require_membership, get_workspace_by_id
+from app.dependencies import get_target_membership, require_admin, require_membership
+from app.utils import get_workspace_by_id
 
 from app.models import Workspace, WorkspaceMember
 from app.schemas import (

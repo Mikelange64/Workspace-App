@@ -14,7 +14,7 @@ from app.database import Base
 
 
 class Task(Base):
-    __tablename__ = "task"
+    __tablename__ = "tasks"
 
     id           : Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     title        : Mapped[str] = mapped_column(String(50), nullable=False)
@@ -23,19 +23,19 @@ class Task(Base):
 
     creator_id: Mapped[int] = mapped_column(
         Integer, 
-        ForeignKey("user.id"), 
+        ForeignKey("users.id"), 
         nullable=False, 
         index=True
     )
     owner_id: Mapped[int] = mapped_column(
         Integer, 
-        ForeignKey("user.id"), 
+        ForeignKey("users.id"), 
         nullable=False, 
         index=True
     )
     workspace_id: Mapped[int] = mapped_column(
         Integer, 
-        ForeignKey("workspace.id"), 
+        ForeignKey("workspaces.id"), 
         nullable=False, 
         index=True
     )

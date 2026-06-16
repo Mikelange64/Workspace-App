@@ -7,8 +7,10 @@ Meant for small projects like planning a trip, or larger projects involving mult
 requires-python = ">=3.14"
 dependencies = [
     "alembic>=1.18.4",
+    "boto3>=1.43.30",
     "fastapi[standard]>=0.135.2",
     "greenlet>=3.3.2",
+    "pillow>=12.2.0",
     "psycopg[binary]>=3.3.4",
     "pwdlib[argon2]>=0.3.0",
     "pydantic-settings>=2.13.1",
