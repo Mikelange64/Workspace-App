@@ -1,0 +1,30 @@
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.empty-state__message {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--color-text-secondary);
+}
+
+.empty-state__cta {
+  padding: 9px 18px;
+  border: none;
+  border-radius: var(--radius-control);
+  background-color: var(--color-brand-primary);
+  color: var(--color-text-on-brand);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.empty-state__cta:hover {
+  background-color: var(--color-brand-primary-hover);
+}

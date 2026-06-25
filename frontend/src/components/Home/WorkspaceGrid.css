@@ -1,0 +1,18 @@
+.workspace-grid-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.workspace-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.workspace-grid__more {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  text-align: center;
+}

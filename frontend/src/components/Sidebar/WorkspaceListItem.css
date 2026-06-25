@@ -1,0 +1,91 @@
+.workspace-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-control);
+}
+
+.workspace-item:hover {
+  background-color: var(--color-bg-sidebar-hover);
+}
+
+.workspace-item__select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 8px 6px 8px 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.workspace-item__title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+}
+
+.workspace-item__menu {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.workspace-item__menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-right: 6px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.workspace-item__menu-trigger:hover {
+  background-color: var(--color-border-strong);
+  color: var(--color-text-primary);
+}
+
+.workspace-item__menu-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 140px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background-color: var(--color-bg-overlay);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  box-shadow: 0 8px 24px hsl(30 20% 10% / 0.12);
+  z-index: 10;
+}
+
+.workspace-item__menu-item {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  text-align: left;
+  font-size: 0.85rem;
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.workspace-item__menu-item:hover {
+  background-color: var(--color-bg-card);
+}
+
+.workspace-item__menu-item--danger {
+  color: var(--color-error-text);
+}

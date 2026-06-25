@@ -1,0 +1,27 @@
+.new-workspace-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 140px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--radius-card);
+  background-color: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.new-workspace-card:hover {
+  background-color: var(--color-bg-card-hover);
+  color: var(--color-text-primary);
+  border-color: var(--color-brand-primary);
+}
+
+.new-workspace-card__plus {
+  font-size: 1.6rem;
+  line-height: 1;
+}

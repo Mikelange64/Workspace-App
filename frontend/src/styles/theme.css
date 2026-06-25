@@ -1,0 +1,195 @@
+:root {
+  /* === Brand === */
+  --color-brand-primary: hsl(184 74% 66%);
+  --color-brand-primary-hover: hsl(184 74% 58%);
+  --color-brand-secondary: hsl(289 42% 76%);
+  --color-brand-secondary-hover: hsl(289 42% 68%);
+
+  /* === Backgrounds / surfaces (elevation: canvas < sidebar < card < overlay) === */
+  --color-bg-canvas: hsl(40 38% 95%);
+  --color-bg-sidebar: hsl(289 30% 93%);
+  --color-bg-card: hsl(40 45% 97%);
+  --color-bg-overlay: hsl(40 35% 99%);
+
+  /* Hover variants — each is darker than its own base surface in light
+     mode (so hovering never accidentally brightens), lighter in dark
+     mode. Defined per-surface rather than borrowing "the next surface
+     up", since the two hue families aren't lightness-monotonic across
+     each other (e.g. sidebar is darker than card). */
+  --color-bg-canvas-hover: hsl(40 38% 88%);
+  --color-bg-sidebar-hover: hsl(289 30% 86%);
+  --color-bg-card-hover: hsl(40 45% 90%);
+
+  /* === Text === */
+  --color-text-primary: hsl(30 20% 12%);
+  --color-text-secondary: hsl(30 14% 28%);
+  --color-text-muted: hsl(30 10% 44%);
+  --color-text-on-brand: hsl(184 70% 12%);
+
+  /* === Borders === */
+  --color-border: hsl(35 22% 85%);
+  --color-border-strong: hsl(35 16% 70%);
+
+  /* === Semantic / status (base = dot or icon, -bg/-text = pill pairs) === */
+  --color-success: hsl(87 45% 52%);
+  --color-success-bg: hsl(87 45% 90%);
+  --color-success-text: hsl(87 45% 26%);
+
+  --color-warning: hsl(50 65% 58%);
+  --color-warning-bg: hsl(50 60% 90%);
+  --color-warning-text: hsl(40 55% 30%);
+
+  --color-error: hsl(8 50% 64%);
+  --color-error-bg: hsl(8 55% 92%);
+  --color-error-text: hsl(8 55% 35%);
+
+  --color-info: hsl(215 48% 60%);
+  --color-info-bg: hsl(215 50% 92%);
+  --color-info-text: hsl(215 50% 32%);
+
+  /* === Layout === */
+  --topbar-height: 64px;
+  --sidebar-width: 280px;
+  --radius-card: 12px 52px 0px 12px;
+  --radius-control: 8px;
+
+  /* === Focus ring === */
+  --focus-ring: 0 0 0 3px hsl(184 74% 66% / 0.45);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-brand-primary: hsl(184 70% 68%);
+    --color-brand-primary-hover: hsl(184 70% 75%);
+    --color-brand-secondary: hsl(289 46% 74%);
+    --color-brand-secondary-hover: hsl(289 46% 80%);
+
+    --color-bg-canvas: hsl(40 16% 11%);
+    --color-bg-sidebar: hsl(289 14% 13%);
+    --color-bg-card: hsl(40 14% 15%);
+    --color-bg-overlay: hsl(40 13% 18%);
+
+    --color-bg-canvas-hover: hsl(40 16% 16%);
+    --color-bg-sidebar-hover: hsl(289 14% 18%);
+    --color-bg-card-hover: hsl(40 14% 20%);
+
+    --color-text-primary: hsl(35 25% 92%);
+    --color-text-secondary: hsl(35 14% 74%);
+    --color-text-muted: hsl(35 10% 56%);
+    --color-text-on-brand: hsl(184 70% 10%);
+
+    --color-border: hsl(35 12% 25%);
+    --color-border-strong: hsl(35 12% 36%);
+
+    --color-success: hsl(87 45% 56%);
+    --color-success-bg: hsl(87 30% 18%);
+    --color-success-text: hsl(87 50% 78%);
+
+    --color-warning: hsl(50 58% 60%);
+    --color-warning-bg: hsl(45 40% 18%);
+    --color-warning-text: hsl(48 60% 78%);
+
+    --color-error: hsl(8 48% 62%);
+    --color-error-bg: hsl(8 40% 18%);
+    --color-error-text: hsl(8 55% 80%);
+
+    --color-info: hsl(215 48% 62%);
+    --color-info-bg: hsl(215 35% 18%);
+    --color-info-text: hsl(215 50% 80%);
+
+    --focus-ring: 0 0 0 3px hsl(184 70% 68% / 0.45);
+  }
+}
+
+/*
+ * Explicit overrides for the manual theme toggle. These take precedence
+ * over the prefers-color-scheme query above regardless of source order,
+ * because an attribute selector on :root has higher specificity than a
+ * bare :root. Only set when the user has made an explicit choice (see
+ * ThemeContext) — absent the attribute, the OS preference above governs.
+ * Values are kept in sync by hand with the two blocks above; there's no
+ * mixin/variable-sharing mechanism in plain CSS to avoid the duplication.
+ */
+:root[data-theme='light'] {
+  --color-brand-primary: hsl(184 74% 66%);
+  --color-brand-primary-hover: hsl(184 74% 58%);
+  --color-brand-secondary: hsl(289 42% 76%);
+  --color-brand-secondary-hover: hsl(289 42% 68%);
+
+  --color-bg-canvas: hsl(40 38% 95%);
+  --color-bg-sidebar: hsl(289 30% 93%);
+  --color-bg-card: hsl(40 45% 97%);
+  --color-bg-overlay: hsl(40 35% 99%);
+
+  --color-bg-canvas-hover: hsl(40 38% 88%);
+  --color-bg-sidebar-hover: hsl(289 30% 86%);
+  --color-bg-card-hover: hsl(40 45% 90%);
+
+  --color-text-primary: hsl(30 20% 12%);
+  --color-text-secondary: hsl(30 14% 28%);
+  --color-text-muted: hsl(30 10% 44%);
+  --color-text-on-brand: hsl(184 70% 12%);
+
+  --color-border: hsl(35 22% 85%);
+  --color-border-strong: hsl(35 16% 70%);
+
+  --color-success: hsl(87 45% 52%);
+  --color-success-bg: hsl(87 45% 90%);
+  --color-success-text: hsl(87 45% 26%);
+
+  --color-warning: hsl(50 65% 58%);
+  --color-warning-bg: hsl(50 60% 90%);
+  --color-warning-text: hsl(40 55% 30%);
+
+  --color-error: hsl(8 50% 64%);
+  --color-error-bg: hsl(8 55% 92%);
+  --color-error-text: hsl(8 55% 35%);
+
+  --color-info: hsl(215 48% 60%);
+  --color-info-bg: hsl(215 50% 92%);
+  --color-info-text: hsl(215 50% 32%);
+
+  --focus-ring: 0 0 0 3px hsl(184 74% 66% / 0.45);
+}
+
+:root[data-theme='dark'] {
+  --color-brand-primary: hsl(184 70% 68%);
+  --color-brand-primary-hover: hsl(184 70% 75%);
+  --color-brand-secondary: hsl(289 46% 74%);
+  --color-brand-secondary-hover: hsl(289 46% 80%);
+
+  --color-bg-canvas: hsl(40 16% 11%);
+  --color-bg-sidebar: hsl(289 14% 13%);
+  --color-bg-card: hsl(40 14% 15%);
+  --color-bg-overlay: hsl(40 13% 18%);
+
+  --color-bg-canvas-hover: hsl(40 16% 16%);
+  --color-bg-sidebar-hover: hsl(289 14% 18%);
+  --color-bg-card-hover: hsl(40 14% 20%);
+
+  --color-text-primary: hsl(35 25% 92%);
+  --color-text-secondary: hsl(35 14% 74%);
+  --color-text-muted: hsl(35 10% 56%);
+  --color-text-on-brand: hsl(184 70% 10%);
+
+  --color-border: hsl(35 12% 25%);
+  --color-border-strong: hsl(35 12% 36%);
+
+  --color-success: hsl(87 45% 56%);
+  --color-success-bg: hsl(87 30% 18%);
+  --color-success-text: hsl(87 50% 78%);
+
+  --color-warning: hsl(50 58% 60%);
+  --color-warning-bg: hsl(45 40% 18%);
+  --color-warning-text: hsl(48 60% 78%);
+
+  --color-error: hsl(8 48% 62%);
+  --color-error-bg: hsl(8 40% 18%);
+  --color-error-text: hsl(8 55% 80%);
+
+  --color-info: hsl(215 48% 62%);
+  --color-info-bg: hsl(215 35% 18%);
+  --color-info-text: hsl(215 50% 80%);
+
+  --focus-ring: 0 0 0 3px hsl(184 70% 68% / 0.45);
+}

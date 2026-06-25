@@ -1,0 +1,37 @@
+.status-dot-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-dot--not-started {
+  background-color: var(--color-text-muted);
+}
+
+.status-dot--in-progress {
+  background-color: var(--color-info);
+}
+
+.status-dot--complete {
+  background-color: var(--color-success);
+}
+
+.status-dot--late {
+  background-color: var(--color-error);
+}
+
+.status-dot__sr-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
