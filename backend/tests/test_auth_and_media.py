@@ -75,7 +75,7 @@ def test_forgot_password_invalid_email_format(client: TestClient):
 
 
 # ========================================================================================
-# RESET PASSWORD  (POST /reset-password) — note: endpoint path has a typo "resert-password"
+# RESET PASSWORD  (POST /reset-password) — note: endpoint path has a typo "reset-password"
 # ========================================================================================
 
 
@@ -95,7 +95,7 @@ def test_reset_password_success(client: TestClient, db_session):
     db_session.commit()
 
     response = client.post(
-        f"{prefix}/resert-password",
+        f"{prefix}/reset-password",
         json={"token": token, "new_password": "newsecurepassword"},
     )
 
@@ -121,7 +121,7 @@ def test_reset_password_invalid_token(client: TestClient):
     create_test_user(client)
 
     response = client.post(
-        f"{prefix}/resert-password",
+        f"{prefix}/reset-password",
         json={"token": "totally-fake-token", "new_password": "newsecurepassword"},
     )
 
@@ -143,7 +143,7 @@ def test_reset_password_expired_token(client: TestClient, db_session):
     db_session.commit()
 
     response = client.post(
-        f"{prefix}/resert-password",
+        f"{prefix}/reset-password",
         json={"token": token, "new_password": "newsecurepassword"},
     )
 
@@ -157,7 +157,7 @@ def test_reset_password_expired_token(client: TestClient, db_session):
 
 def test_reset_password_missing_new_password(client: TestClient):
     response = client.post(
-        f"{prefix}/resert-password",
+        f"{prefix}/reset-password",
         json={"token": "some-token"},
     )
     assert response.status_code == 422
@@ -165,7 +165,7 @@ def test_reset_password_missing_new_password(client: TestClient):
 
 def test_reset_password_new_password_too_short(client: TestClient):
     response = client.post(
-        f"{prefix}/resert-password",
+        f"{prefix}/reset-password",
         json={"token": "some-token", "new_password": "short"},
     )
     assert response.status_code == 422

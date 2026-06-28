@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
+import { Outlet, useNavigate } from 'react-router-dom'
 import Topbar from './components/Topbar/Topbar'
 import Sidebar from './components/Sidebar/Sidebar'
-import HomeCanvas from './components/Home/HomeCanvas'
 import NewWorkspaceModal from './components/Home/NewWorkspaceModal'
+import ProfileModal from './components/Profile/ProfileModal'
 import { useAuth } from './context/AuthContext'
 import {
   authFetch,
@@ -47,14 +48,22 @@ function normalizeWorkspace(ws) {
 
 function AppShell() {
   const { user, logout } = useAuth()
+  const navigate = useNavigate()
   const [workspaces, setWorkspaces] = useState([])
   const [searchValue, setSearchValue] = useState('')
   const [showNewModal, setShowNewModal] = useState(false)
+  const [showProfileModal, setShowProfileModal] = useState(false)
 
   useEffect(() => {
-    authFetch('/workspaces')
-      .then((data) => setWorkspaces(data.workspaces.map(normalizeWorkspace)))
-      .catch(console.error)
+    async function loadWorkspaces() {
+      try {
+        const data = await authFetch('/workspaces')
+        setWorkspaces(data.workspaces.map(normalizeWorkspace))
+      } catch (err) {
+        console.error(err)
+      }
+    }
+    loadWorkspaces()
   }, [])
 
   const currentUser = {
@@ -62,17 +71,14 @@ function AppShell() {
     avatarUrl: toAvatarUrl(user?.image_path),
   }
 
-  // Archived workspaces are hidden from the main view
   const activeWorkspaces = workspaces.filter((ws) => !ws.isArchived)
 
-  // Search only drives the Topbar dropdown — sidebar and canvas are always unfiltered
   const searchSuggestions = searchValue.trim()
     ? activeWorkspaces.filter((ws) =>
         ws.title.toLowerCase().includes(searchValue.toLowerCase())
       )
     : []
 
-  // Derive upcoming tasks from all active workspaces, incomplete only
   const upcomingTasks = activeWorkspaces.flatMap((ws) =>
     ws.tasks
       .filter((t) => !t.isCompleted)
@@ -84,6 +90,10 @@ function AppShell() {
         workspaceId: ws.id,
       }))
   )
+
+  function handleSelectWorkspace(id) {
+    navigate(`/workspaces/${id}`)
+  }
 
   async function handleTogglePin(id) {
     const ws = workspaces.find((w) => w.id === id)
@@ -146,6 +156,18 @@ function AppShell() {
     setShowNewModal(false)
   }
 
+  const outletCtx = {
+    workspaces,
+    activeWorkspaces,
+    upcomingTasks,
+    onSelectWorkspace: handleSelectWorkspace,
+    onNewWorkspace: () => setShowNewModal(true),
+    onTogglePin: handleTogglePin,
+    onArchive: handleArchive,
+    onDelete: handleDelete,
+    onLeave: handleLeave,
+  }
+
   return (
     <div className="app-shell">
       <Sidebar
@@ -154,37 +176,32 @@ function AppShell() {
         onNewWorkspace={() => setShowNewModal(true)}
         onOpenInbox={() => console.log('open inbox')}
         onOpenKanbanOverview={() => console.log('open kanban overview')}
-        onSelectWorkspace={(id) => console.log('select workspace', id)}
+        onSelectWorkspace={handleSelectWorkspace}
         onTogglePin={handleTogglePin}
         onArchive={handleArchive}
         onLeave={handleLeave}
         onDelete={handleDelete}
-        onProfileClick={() => console.log('profile click')}
+        onProfileClick={() => setShowProfileModal(true)}
       />
 
       <div className="app-shell__main">
         <Topbar
+          onLogoClick={() => navigate('/')}
           searchValue={searchValue}
           onSearchChange={setSearchValue}
           onSearchSubmit={(value) => console.log('search submit:', value)}
           searchSuggestions={searchSuggestions}
-          onSelectSuggestion={(id) => console.log('open workspace from search', id)}
+          onSelectSuggestion={handleSelectWorkspace}
           user={currentUser}
           notificationCount={0}
           onCalendarToggle={() => console.log('calendar toggle')}
           onNotificationsClick={() => console.log('notifications click')}
           onProfileClick={(action) => {
             if (action === 'sign-out') logout()
+            else if (action === 'account') setShowProfileModal(true)
           }}
         />
-
-        <HomeCanvas
-          workspaces={activeWorkspaces}
-          comingUpTasks={upcomingTasks}
-          onSelectWorkspace={(id) => console.log('open workspace', id)}
-          onNewWorkspace={() => setShowNewModal(true)}
-          onSelectTask={(id) => console.log('open task', id)}
-        />
+        <Outlet context={outletCtx} />
       </div>
 
       {showNewModal && (
@@ -192,6 +209,10 @@ function AppShell() {
           onClose={() => setShowNewModal(false)}
           onCreate={handleCreateWorkspace}
         />
+      )}
+
+      {showProfileModal && (
+        <ProfileModal onClose={() => setShowProfileModal(false)} />
       )}
     </div>
   )

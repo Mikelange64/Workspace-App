@@ -15,6 +15,7 @@ class User(Base) :
     username      : Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     email         : Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
     password_hash : Mapped[str] = mapped_column(String(100), nullable=False)
+    is_verified   : Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_superuser  : Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     image_file    : Mapped[str | None] = mapped_column(String(200), default=None)
     last_login    : Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -47,6 +48,14 @@ class User(Base) :
     )
     refresh_tokens : Mapped[list["RefreshToken"]] = relationship(
         back_populates="user",
+        cascade="all, delete-orphan"
+    )
+    verification_tokens : Mapped[list["VerificationToken"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+    folders : Mapped[list["Folder"]] = relationship(
+        back_populates="owner",
         cascade="all, delete-orphan"
     )
 
@@ -88,3 +97,17 @@ class RefreshToken(Base):
     )
 
     user: Mapped["User"] = relationship(back_populates="refresh_tokens")
+
+
+class VerificationToken(Base):
+    __tablename__ = "verification_tokens"
+
+    id         : Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id    : Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    token_hash : Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    expires_at : Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at : Mapped[datetime] = mapped_column(  
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+
+    user: Mapped["User"] = relationship(back_populates="verification_tokens")

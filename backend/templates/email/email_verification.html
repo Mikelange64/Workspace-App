@@ -36,7 +36,7 @@ We also wanna tables for layout. It is the most reliable way to get consistent r
                         <!-- Body -->
                         <tr>
                             <td style="padding: 40px 30px;">
-                                <h2 style="margin: 0 0 20px 0; color: #333333; font-size: 20px;">Reset Your Password</h2>
+                                <h2 style="margin: 0 0 20px 0; color: #333333; font-size: 20px;">Verify your email address</h2>
                                 <p style="margin: 0 0 15px 0;
                                           color: #555555;
                                           font-size: 16px;
@@ -45,7 +45,7 @@ We also wanna tables for layout. It is the most reliable way to get consistent r
                                           color: #555555;
                                           font-size: 16px;
                                           line-height: 1.5">
-                                    You requested to reset your password. Click the button below to set a new password:
+                                    Welcome to Filobelo! Please verify your email address to activate your account.
                                 </p>
                                 <!-- Button -->
                                 <table role="presentation"
@@ -54,13 +54,13 @@ We also wanna tables for layout. It is the most reliable way to get consistent r
                                        style="margin: 0 auto 25px auto">
                                     <tr>
                                         <td style="background-color: #1f7a82; border-radius: 5px;">
-                                            <a href="{{ reset_url }}"
+                                            <a href="{{ verification_url }}"
                                                style="display: inline-block;
                                                       padding: 15px 30px;
                                                       color: #ffffff;
                                                       text-decoration: none;
                                                       font-size: 16px;
-                                                      font-weight: bold">Reset Password</a>
+                                                      font-weight: bold">Verify Email</a>
                                         </td>
                                     </tr>
                                 </table>
@@ -68,13 +68,13 @@ We also wanna tables for layout. It is the most reliable way to get consistent r
                                           color: #777777;
                                           font-size: 14px;
                                           line-height: 1.5">
-                                    This link will expire in <strong>1 hour</strong>.
+                                    This link will expire in <strong>24 hour</strong>.
                                 </p>
                                 <p style="margin: 0 0 15px 0;
                                           color: #777777;
                                           font-size: 14px;
                                           line-height: 1.5">
-                                    If you didn't request this password reset, you can safely ignore this email. Your password will remain unchanged.
+                                    If you didn't sign up for a Filobelo account, you can safely ignore this email.
                                 </p>
                                 <!-- Fallback Link -->
                                 <p style="margin: 25px 0 0 0;
@@ -83,7 +83,7 @@ We also wanna tables for layout. It is the most reliable way to get consistent r
                                           line-height: 1.5">
                                     If the button doesn't work, copy and paste this link into your browser:
                                     <br>
-                                    <a href="{{ reset_url }}" style="color: #1f7a82; word-break: break-all;">{{ reset_url }}</a>
+                                    <a href="{{ verification_url }}" style="color: #1f7a82; word-break: break-all;">{{ verification_url }}</a>
                                 </p>
                             </td>
                         </tr>

@@ -1,10 +1,12 @@
 from .auth import (
+    EmailVerification,
     ChangePasswordRequest,
     ForgotPasswordRequest,
     RefreshRequest,
     ResetPasswordRequest,
     Token,
 )
+from .folders import FolderCreate, FolderResponse, FolderUpdate
 from .tasks import PaginatedTaskResponse, TaskCreate, TaskMove, TaskResponse, TaskSummary, TaskUpdate
 from .users import (
     PaginatedSuperUserResponse,
@@ -13,6 +15,7 @@ from .users import (
     UserPrivate,
     UserPublic,
     UserUpdate,
+    WorkspaceMemberPublic,
 )
 from .workspaces import (
     PaginatedWorkspaceResponse,
@@ -29,23 +32,30 @@ __all__ = [
     "TaskSummary",
     "PaginatedTaskResponse",
     "TaskUpdate",
-    
+
+    # FOLDER
+    "FolderCreate",
+    "FolderResponse",
+    "FolderUpdate",
+
     # WORKSPACE
     "WorkspaceCreate",
     "WorkspaceResponse",
     "WorkspaceUpdate",
     "PaginatedWorkspaceResponse",
-    
+
     # USER
     "SuperUserResponse",
     "UserCreate",
     "UserPublic",
     "UserPrivate",
     "UserUpdate",
+    "WorkspaceMemberPublic",
     "Token",
     "PaginatedSuperUserResponse",
-    
+
     # AUTH
+    "EmailVerification",
     "ForgotPasswordRequest",
     "RefreshRequest",
     "ResetPasswordRequest",

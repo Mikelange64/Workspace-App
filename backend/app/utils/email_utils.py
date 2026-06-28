@@ -1,10 +1,12 @@
 import smtplib
-from email.message import EmailMessage  # from Python stdlib
+from email.message import EmailMessage
+from pathlib import Path
 
 from app.config import settings
 from fastapi.templating import Jinja2Templates
 
-templates = Jinja2Templates(directory="templates")
+_TEMPLATES_DIR = Path(__file__).parent.parent.parent / "templates"
+templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 
 
 def send_email(
@@ -39,20 +41,46 @@ def send_password_reset_email(to_email: str, username: str, token: str) -> None:
     html_content = template.render(reset_url=reset_url, username=username)
 
     plain_text = f"""Hi {username},
-
+    
     You requested to reset your password. Click the link below to set a new password:
-
+    
     {reset_url}
-
+    
     If you didn't request this, you can safely ignore this email.
-
+    
     Best Regards,
     The Fast API Blog Team
     """
 
     send_email(
         to_email=to_email,
-        subject="Reset Your Password - FastAPI Blog",
+        subject="Reset Your Password - Filobelo",
+        plain_text=plain_text,
+        html_content=html_content,
+    )
+
+
+def send_verification_email(to_email: str, username: str, token: str) -> None:
+    verification_url = f"{settings.frontend_url}/verify-email?token={token}"
+
+    template = templates.env.get_template("email/email_verification.html")
+    html_content = template.render(verification_url=verification_url, username=username)
+
+    plain_text = f"""Hi {username},
+
+    Welcome to Filobelo! Please verify your email address to activate your account.
+
+    {verification_url}
+
+    This link will expire in 24 hours. If you didn't sign up for Filobelo, you can safely ignore this email.
+
+    Best Regards,
+    The Filobelo Team
+    """
+
+    send_email(
+        to_email=to_email,
+        subject="Verify your email - Filobelo",
         plain_text=plain_text,
         html_content=html_content,
     )

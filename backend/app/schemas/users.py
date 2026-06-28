@@ -44,3 +44,10 @@ class PaginatedSuperUserResponse(Base):
 class UserUpdate(UserBase):
     username   : str | None      = Field(default=None, min_length=5, max_length=50)
     email      : EmailStr | None = Field(default=None,  max_length=120)
+
+
+class WorkspaceMemberPublic(BaseModel):
+    id         : int
+    username   : str
+    image_path : str
+    role       : str

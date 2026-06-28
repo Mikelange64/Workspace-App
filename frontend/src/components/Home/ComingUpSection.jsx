@@ -10,7 +10,7 @@ function byDueDate(a, b) {
 }
 
 function getTaskUrgency(dueDate) {
-  if (!dueDate) return 'neutral'
+  if (!dueDate) return 'success'
   const days = getDaysRemaining(dueDate)
   if (days < 0) return 'error'
   if (days <= 3) return 'warning'

@@ -1,5 +1,4 @@
 import WorkspaceListItem from './WorkspaceListItem'
-import ThemeToggle from '../shared/ThemeToggle'
 import './Sidebar.css'
 
 function byMostRecent(a, b) {
@@ -111,7 +110,6 @@ function Sidebar({
           </span>
         </button>
 
-        <ThemeToggle />
       </div>
     </nav>
   )

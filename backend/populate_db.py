@@ -275,7 +275,9 @@ def clear_existing_data() -> None:
     with SessionLocal() as db:
         db.execute(delete(RefreshToken))
         db.execute(delete(PasswordResetToken))
-        db.execute(delete(Workspace))   # cascades WorkspaceMember + Task
+        db.execute(delete(Task))
+        db.execute(delete(WorkspaceMember))
+        db.execute(delete(Workspace))
         db.execute(delete(User))
         db.commit()
 

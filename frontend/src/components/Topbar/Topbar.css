@@ -223,3 +223,7 @@
 .topbar__profile-menu-item:hover {
   background-color: var(--color-bg-canvas);
 }
+
+.topbar__profile-menu-item--danger {
+  color: var(--color-error);
+}

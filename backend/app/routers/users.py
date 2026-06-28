@@ -2,23 +2,25 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from PIL import UnidentifiedImageError
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func, or_, select
 from sqlalchemy import delete as sql_delete
 
 from app.auth import (
-    CurrentUser, 
-    create_access_token, 
-    hash_password, 
-    verify_password, 
-    generate_reset_tokens, 
+    CurrentUser,
+    get_current_user,
+    create_access_token,
+    hash_password,
+    verify_password,
+    generate_reset_tokens,
     hash_reset_token
 )
 from app.config import settings
 from app.database import DbSession
-from app.models import User, Workspace, WorkspaceMember, PasswordResetToken, RefreshToken
+from app.models import User, Workspace, WorkspaceMember, PasswordResetToken, RefreshToken, VerificationToken
 from app.schemas import (
+    EmailVerification,
     ChangePasswordRequest,
     ForgotPasswordRequest,
     RefreshRequest,
@@ -35,7 +37,8 @@ from app.utils import (
     get_user_by_id, 
     process_profile_image,
     upload_profile_image, 
-    send_password_reset_email
+    send_password_reset_email,
+    send_verification_email
 )
 
 from botocore.exceptions import ClientError
@@ -71,10 +74,23 @@ def create_user(user: UserCreate, db: DbSession):
     )
 
     db.add(new_user)
+    db.flush()
+
+    token = generate_reset_tokens()
+    token_hash = hash_reset_token(token)
+    expires_at = datetime.now(UTC) + timedelta(hours=24)
+
+    db.add(VerificationToken(user_id=new_user.id, token_hash=token_hash, expires_at=expires_at))
     db.commit()
     db.refresh(new_user)
-    return new_user
 
+    try:
+        send_verification_email(to_email=new_user.email, username=new_user.username, token=token)
+    except Exception as exc:
+        print(f"[mail] Failed to send verification email to {new_user.email}: {exc}")
+
+    return new_user
+    
 
 @router.post("/login", response_model=Token)
 def login(
@@ -242,16 +258,59 @@ def delete_user(current_user: CurrentUser, db: DbSession):
 
 
 # ========================================================================================
+# EMAIL VERIFICATION
+# ========================================================================================
+
+
+@router.post("/verify-email", status_code=status.HTTP_200_OK)
+def verify_email(request_data: EmailVerification, db: DbSession):
+    token_hash = hash_reset_token(request_data.token)
+
+    verification_token = (
+        db.execute(select(VerificationToken)
+        .where(VerificationToken.token_hash == token_hash))
+        .scalars().first()
+    )
+
+    if not verification_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification link",
+        )
+
+    if verification_token.expires_at < datetime.now(UTC):
+        db.delete(verification_token)
+        db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification link",
+        )
+
+    user = (
+        db.execute(select(User).where(User.id == verification_token.user_id))
+        .scalars().first()
+    )
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification link",
+        )
+
+    user.is_verified = True
+    db.delete(verification_token)
+    db.commit()
+
+    return {"message": "Email verified successfully"}
+
+
+# ========================================================================================
 # PASSWORD RESET
 # ========================================================================================
 
 
 @router.post("/forgot-password", status_code=status.HTTP_202_ACCEPTED)
-def forgot_password(
-    db               : DbSession,
-    request_data     : ForgotPasswordRequest,
-    background_tasks : BackgroundTasks,
-):
+def forgot_password(db: DbSession, request_data: ForgotPasswordRequest):
     user = (
         db.execute(select(User)
         .where(func.lower(User.email) == request_data.email.lower()))
@@ -259,40 +318,29 @@ def forgot_password(
     )
 
     if user:
-        # delete existing reset tokens for security
         db.execute(
             sql_delete(PasswordResetToken).where(PasswordResetToken.user_id == user.id)
         )
 
         token      = generate_reset_tokens()
         token_hash = hash_reset_token(token)
-        expires_at = datetime.now(UTC) + timedelta(settings.reset_token_expire_minutes)
+        expires_at = datetime.now(UTC) + timedelta(minutes=settings.reset_token_expire_minutes)
 
-        reset_token = PasswordResetToken(
-            user_id=user.id, token_hash=token_hash, expires_at=expires_at
-        )
-
-        db.add(reset_token)
+        db.add(PasswordResetToken(user_id=user.id, token_hash=token_hash, expires_at=expires_at))
         db.commit()
 
-        # we send the unhashed token to the user
-        background_tasks.add_task(
-            send_password_reset_email,
-            to_email=user.email,
-            username=user.username,
-            token=token,
-        )
+        try:
+            send_password_reset_email(to_email=user.email, username=user.username, token=token)
+        except Exception as exc:
+            print(f"[mail] Failed to send password reset email to {user.email}: {exc}")
 
-    # for security reasons we don't reveal if the user exists (protect from email enumeration attacks)
     return {
-        "message": "If an account exists with this email, you wil recieve password reset instructions"
+        "message": "If an account exists with this email, you will receive password reset instructions"
     }
 
 
-@router.post("/resert-password")
-def reset_password(
-    request_data: ResetPasswordRequest, db: DbSession
-):
+@router.post("/reset-password")
+def reset_password(request_data: ResetPasswordRequest, db: DbSession):
     token_hash = hash_reset_token(request_data.token)
 
     reset_token = (
@@ -340,14 +388,12 @@ def reset_password(
 
 @router.patch("/me/password")
 def change_password(
-    current_user: CurrentUser,
-    password_data: ChangePasswordRequest,
-    db: DbSession
+    current_user: CurrentUser, password_data: ChangePasswordRequest, db: DbSession
 ):
     if not verify_password(password_data.current_password, current_user.password_hash):
         raise HTTPException(
-            status_code=status.HTTP_400_FORBIDDEN,
-            detail="current password is incorrect",
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Current password is incorrect",
         )
 
     new_password_hash = hash_password(password_data.new_password)
@@ -379,6 +425,23 @@ def get_user_workspaces(current_user: CurrentUser, db: DbSession):
     return workspaces
 
 
+@router.get("/search", response_model=UserPublic, dependencies=[Depends(get_current_user)])
+def search_user(q: Annotated[str, Query(min_length=1)], db: DbSession,):
+    user = db.execute(
+        select(User).where(
+            or_(
+                func.lower(User.username) == q.strip().lower(),
+                func.lower(User.email) == q.strip().lower(),
+            )
+        )
+    ).scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No user found with that username or email")
+
+    return user
+
+
 @router.get("/{user_id}", response_model=UserPublic)
 def get_user(user_id: int, db: DbSession):
     user = get_user_by_id(user_id, db)
@@ -386,9 +449,7 @@ def get_user(user_id: int, db: DbSession):
 
 
 @router.patch("/me/picture", response_model=UserPrivate)
-def upload_profile_picture(
-    file: UploadFile, current_user: CurrentUser, db: DbSession
-):
+def upload_profile_picture(file: UploadFile, current_user: CurrentUser, db: DbSession):
     content = file.file.read()  # file.file because the app is sync
 
     if len(content) > settings.max_upload_size_bytes:
@@ -425,10 +486,9 @@ def upload_profile_picture(
     return current_user
 
 
+
 @router.delete("/me/picture", response_model=UserPrivate)
-def delete_profile_picture(
-    current_user: CurrentUser, db: DbSession,
-):
+def delete_profile_picture(current_user: CurrentUser, db: DbSession,):
     old_filename = current_user.image_file
 
     if old_filename is None:

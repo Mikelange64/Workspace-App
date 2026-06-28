@@ -178,8 +178,7 @@
   --focus-ring: 0 0 0 3px hsl(184 74% 66% / 0.45);
 }
 
-/* ===== Manual toggle — dark · Option 1: Pure neutral gray ===== */
-/* Sidebar and canvas share the same hue-less gray — separated by border only. */
+/* ===== Manual toggle — dark (neutral gray) ===== */
 :root[data-theme='dark'] {
   --color-brand-primary: hsl(184 74% 66%);
   --color-brand-primary-hover: hsl(184 74% 74%);
@@ -230,11 +229,8 @@
   --focus-ring: 0 0 0 3px hsl(184 74% 66% / 0.40);
 }
 
-/* ===== ALTERNATIVE DARK MODE · Option 2: Blue-tinted navy ===== */
-/* To activate: comment out Option 1 above and uncomment this block.        */
-/* Variable names are identical — swap is a one-comment toggle.             */
-/*
-:root[data-theme='dark'] {
+/* ===== Manual toggle — midnight (blue-tinted navy) ===== */
+:root[data-theme='midnight'] {
   --color-brand-primary: hsl(184 74% 66%);
   --color-brand-primary-hover: hsl(184 74% 74%);
   --color-brand-secondary: hsl(184 60% 55%);
@@ -283,4 +279,3 @@
 
   --focus-ring: 0 0 0 3px hsl(184 74% 66% / 0.40);
 }
-*/

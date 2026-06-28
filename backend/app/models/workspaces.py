@@ -16,12 +16,14 @@ from app.database import Base
 class Workspace(Base):
     __tablename__ = "workspaces"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    creator_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"))
-    title: Mapped[str] = mapped_column(String(50), nullable=False)
-    description: Mapped[str] = mapped_column(Text, nullable=False)
-    max_number: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+    id          : Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    creator_id  : Mapped[int] = mapped_column(Integer, ForeignKey("users.id"))
+    title       : Mapped[str] = mapped_column(String(50), nullable=False)
+    description : Mapped[str] = mapped_column(Text, nullable=False)
+    max_number  : Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+    folder_id   : Mapped[int | None] = mapped_column(Integer, ForeignKey("folders.id"), nullable=True, default=None, index=True)
 
+    folder: Mapped["Folder | None"] = relationship(back_populates="workspaces")
     members: Mapped[list["User"]] = relationship(
         secondary="workspace_member", back_populates="workspaces", viewonly=True
     )
@@ -66,3 +68,18 @@ class Workspace(Base):
             return None
 
         return self.due_date - datetime.now(UTC)
+
+
+class Folder(Base):
+    __tablename__ = "folders"
+
+    id         : Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    owner_id   : Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    name       : Mapped[str] = mapped_column(String(50), nullable=False)
+    color      : Mapped[str] = mapped_column(String(50), nullable=False)
+    created_at : Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+
+    owner      : Mapped["User"] = relationship(back_populates="folders")
+    workspaces : Mapped[list["Workspace"]] = relationship(back_populates="folder")

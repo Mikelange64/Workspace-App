@@ -5,6 +5,7 @@ import './Topbar.css'
 
 function Topbar({
   logoSlot,
+  onLogoClick,
   searchValue = '',
   onSearchChange,
   onSearchSubmit,
@@ -58,7 +59,16 @@ function Topbar({
   return (
     <header className="topbar">
       <div className="topbar__logo">
-        {logoSlot ?? <span className="topbar__logo-placeholder">WS</span>}
+        {logoSlot ?? (
+          <button
+            type="button"
+            className="topbar__logo-placeholder"
+            onClick={onLogoClick}
+            aria-label="Go to home"
+          >
+            WS
+          </button>
+        )}
       </div>
 
       <div
@@ -160,26 +170,16 @@ function Topbar({
                   type="button"
                   role="menuitem"
                   className="topbar__profile-menu-item"
-                  onClick={() => handleProfileItemClick('profile')}
+                  onClick={() => handleProfileItemClick('account')}
                 >
-                  Profile
+                  Account
                 </button>
               </li>
               <li role="none">
                 <button
                   type="button"
                   role="menuitem"
-                  className="topbar__profile-menu-item"
-                  onClick={() => handleProfileItemClick('settings')}
-                >
-                  Settings
-                </button>
-              </li>
-              <li role="none">
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="topbar__profile-menu-item"
+                  className="topbar__profile-menu-item topbar__profile-menu-item--danger"
                   onClick={() => handleProfileItemClick('sign-out')}
                 >
                   Sign out

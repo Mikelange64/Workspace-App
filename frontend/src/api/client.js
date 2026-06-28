@@ -61,7 +61,7 @@ export async function authFetch(path, options = {}) {
       res = await fetch(`${BASE_URL}${path}`, { ...options, headers: makeHeaders(newToken) })
     } catch {
       clearTokens()
-      window.location.href = '/login'
+      window.dispatchEvent(new CustomEvent('auth:expired'))
       throw new ApiError(401, 'Session expired')
     }
   }
@@ -136,6 +136,100 @@ export function deleteWorkspace(id) {
 
 export function leaveWorkspace(id) {
   return authFetch(`/workspaces/${id}/members/me`, { method: 'DELETE' })
+}
+
+// Workspace detail
+export function getWorkspace(id) {
+  return authFetch(`/workspaces/${id}`)
+}
+
+export function getMembersWithRoles(workspaceId) {
+  return authFetch(`/workspaces/${workspaceId}/members`)
+}
+
+export function inviteMember(workspaceId, userId) {
+  return authFetch(`/workspaces/${workspaceId}/members/${userId}`, { method: 'PATCH' })
+}
+
+export function promoteToAdmin(workspaceId, userId) {
+  return authFetch(`/workspaces/${workspaceId}/members/${userId}/admin`, { method: 'PATCH' })
+}
+
+export function removeMember(workspaceId, userId) {
+  return authFetch(`/workspaces/${workspaceId}/members/${userId}`, { method: 'DELETE' })
+}
+
+export function searchUser(q) {
+  return authFetch(`/users/search?q=${encodeURIComponent(q)}`)
+}
+
+export function reassignTask(workspaceId, taskId, userId) {
+  return authFetch(`/workspaces/${workspaceId}/tasks/${taskId}/owner?user_id=${userId}`, { method: 'PATCH' })
+}
+
+// Task CRUD (scoped to a workspace)
+export function createTask(workspaceId, data) {
+  return authFetch(`/workspaces/${workspaceId}/tasks/`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function patchTask(workspaceId, taskId, data) {
+  return authFetch(`/workspaces/${workspaceId}/tasks/${taskId}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+export function deleteTask(workspaceId, taskId) {
+  return authFetch(`/workspaces/${workspaceId}/tasks/${taskId}`, {
+    method: 'DELETE',
+  })
+}
+
+export function toggleTask(workspaceId, taskId) {
+  return authFetch(`/workspaces/${workspaceId}/tasks/${taskId}/complete`, {
+    method: 'PATCH',
+  })
+}
+
+// User self-management
+export function updateUser(data) {
+  return authFetch('/users/me', { method: 'PATCH', body: JSON.stringify(data) })
+}
+
+export function deleteAccount() {
+  return authFetch('/users/me', { method: 'DELETE' })
+}
+
+export function changePassword(currentPassword, newPassword) {
+  return authFetch('/users/me/password', {
+    method: 'PATCH',
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  })
+}
+
+export function removeAvatar() {
+  return authFetch('/users/me/picture', { method: 'DELETE' })
+}
+
+export async function forgotPassword(email) {
+  const res = await fetch(`${BASE_URL}/users/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  })
+  return parseResponse(res)
+}
+
+export async function resetPassword(token, newPassword) {
+  const res = await fetch(`${BASE_URL}/users/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, new_password: newPassword }),
+  })
+  return parseResponse(res)
 }
 
 // Avatar upload — multipart, so Content-Type must NOT be set manually

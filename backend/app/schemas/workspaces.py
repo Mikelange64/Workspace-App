@@ -23,6 +23,8 @@ class WorkspaceResponse(WorkspaceBase):
     model_config = ConfigDict(from_attributes=True)
 
     id                : int
+    creator_id        : int
+    folder_id         : int | None
     title             : str
     description       : str
     max_number        : int | None
@@ -54,3 +56,4 @@ class WorkspaceUpdate(WorkspaceBase):
     due_date     : datetime | None = None
     is_pinned    : bool | None = None
     is_archived  : bool | None = None
+    folder_id    : int | None = None

@@ -4,7 +4,7 @@ from .image_utils import (
     upload_profile_image,
 )
 from .queries import get_task_by_id, get_user_by_id, get_workspace_by_id
-from .email_utils import send_password_reset_email
+from .email_utils import send_password_reset_email, send_verification_email
 
 __all__ = [
     "get_user_by_id",
@@ -13,5 +13,6 @@ __all__ = [
     "upload_profile_image",
     "delete_profile_image",
     "process_profile_image",
-    "send_password_reset_email"
+    "send_password_reset_email",
+    "send_verification_email"
 ]

@@ -21,10 +21,25 @@ export function AuthProvider({ children }) {
       setLoading(false)
       return
     }
-    authFetch('/users/me')
-      .then(setUser)
-      .catch(() => clearTokens())
-      .finally(() => setLoading(false))
+    async function checkSession() {
+      try {
+        const me = await authFetch('/users/me')
+        setUser(me)
+      } catch {
+        clearTokens()
+      } finally {
+        setLoading(false)
+      }
+    }
+    checkSession()
+  }, [])
+
+  useEffect(() => {
+    function handleExpired() {
+      setUser(null)
+    }
+    window.addEventListener('auth:expired', handleExpired)
+    return () => window.removeEventListener('auth:expired', handleExpired)
   }, [])
 
   async function login(emailOrUsername, password) {
@@ -39,6 +54,11 @@ export function AuthProvider({ children }) {
     await login(username, password)
   }
 
+  async function refreshUser() {
+    const me = await authFetch('/users/me')
+    setUser(me)
+  }
+
   async function logout() {
     const { refresh } = getTokens()
     try {
@@ -51,7 +71,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   )
