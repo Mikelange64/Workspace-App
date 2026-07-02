@@ -157,42 +157,6 @@
   color: var(--color-text-primary);
 }
 
-/* ─── Select ──────────────────────────────────────────────────────────────── */
-
-.modal__select-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.modal__select {
-  width: 100%;
-  padding: 8px 32px 8px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  background: var(--color-bg-canvas);
-  color: var(--color-text-primary);
-  font-size: 0.9375rem;
-  font-family: inherit;
-  appearance: none;
-  cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s;
-  box-sizing: border-box;
-}
-
-.modal__select:focus {
-  outline: none;
-  border-color: var(--color-brand-primary);
-  box-shadow: var(--focus-ring);
-}
-
-.modal__select-chevron {
-  position: absolute;
-  right: 10px;
-  pointer-events: none;
-  color: var(--color-text-muted);
-}
-
 /* ─── Date spinner row ────────────────────────────────────────────────────── */
 
 .nwm-date-row {

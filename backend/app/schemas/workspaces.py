@@ -10,7 +10,7 @@ class Base(BaseModel):
 
 class WorkspaceBase(BaseModel):
     title       : str = Field(min_length=1, max_length=50)
-    description : str = Field(min_length=1, max_length=500)
+    description : str | None = Field(min_length=1, max_length=500, default=None)
     max_number  : int | None = None
     due_date    : datetime | None = None
 
@@ -26,7 +26,7 @@ class WorkspaceResponse(WorkspaceBase):
     creator_id        : int
     folder_id         : int | None
     title             : str
-    description       : str
+    description       : str | None
     max_number        : int | None
     num_of_members    : int
     num_of_tasks      : int

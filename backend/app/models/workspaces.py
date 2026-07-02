@@ -18,7 +18,7 @@ class Workspace(Base):
     id          : Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     creator_id  : Mapped[int] = mapped_column(Integer, ForeignKey("users.id"))
     title       : Mapped[str] = mapped_column(String(50), nullable=False)
-    description : Mapped[str] = mapped_column(Text, nullable=False)
+    description : Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
     max_number  : Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
     folder_id   : Mapped[int | None] = mapped_column(Integer, ForeignKey("folders.id"), nullable=True, default=None, index=True)
 

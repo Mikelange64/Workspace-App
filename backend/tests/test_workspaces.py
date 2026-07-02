@@ -77,7 +77,6 @@ def test_create_workspace_with_optional_fields(client: TestClient, user_auth_hea
     [
         pytest.param({"description": "No title here."}, id="missing_title"),
         pytest.param({"title": "", "description": "Empty title"}, id="empty_title"),
-        pytest.param({"title": "No Description"}, id="missing_description"),
     ],
 )
 def test_create_workspace_validation_error(
@@ -85,6 +84,14 @@ def test_create_workspace_validation_error(
 ):
     response = client.post(wsprefix, json=payload, headers=user_auth_headers)
     assert response.status_code == 422
+
+
+def test_create_workspace_without_description(client: TestClient, user_auth_headers):
+    response = client.post(
+        wsprefix, json={"title": "No Description"}, headers=user_auth_headers
+    )
+    assert response.status_code == 201
+    assert response.json()["description"] is None
 
 
 def test_create_workspace_no_auth(client: TestClient):
@@ -265,7 +272,7 @@ def test_full_update_workspace_auth_failures(
     assert response.status_code == expected_status
 
 
-def test_full_update_workspace_missing_fields(
+def test_full_update_workspace_without_description(
     client: TestClient, user_auth_headers, workspace
 ):
     response = client.put(
@@ -273,7 +280,8 @@ def test_full_update_workspace_missing_fields(
         json={"title": "Missing Description"},
         headers=user_auth_headers,
     )
-    assert response.status_code == 422
+    assert response.status_code == 200
+    assert response.json()["description"] is None
 
 
 def test_full_update_workspace_nonexistent(client: TestClient, user_auth_headers):

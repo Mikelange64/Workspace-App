@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import './NewWorkspaceModal.css'
 
-const MAX_MEMBER_OPTIONS = ['', '2', '5', '10', '15', '20', '25', '50', '100']
-
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
@@ -195,7 +193,7 @@ function NewWorkspaceModal({ onClose, onCreate, defaultDueDate = null }) {
     try {
       await onCreate({
         title: title.trim(),
-        description: description.trim(),
+        description: description.trim() || null,
         due_date: selectedDate ? selectedDate.toISOString() : null,
         max_number: maxMembers ? parseInt(maxMembers, 10) : null,
       })
@@ -205,7 +203,10 @@ function NewWorkspaceModal({ onClose, onCreate, defaultDueDate = null }) {
     }
   }
 
-  const canSubmit = title.trim().length > 0 && description.trim().length > 0 && !loading
+  const maxMembersValid =
+    maxMembers.trim() === '' || (/^\d+$/.test(maxMembers.trim()) && parseInt(maxMembers, 10) >= 1)
+
+  const canSubmit = title.trim().length > 0 && maxMembersValid && !loading
 
   return (
     <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
@@ -233,14 +234,13 @@ function NewWorkspaceModal({ onClose, onCreate, defaultDueDate = null }) {
           </div>
 
           <div className="modal__field">
-            <label className="modal__label" htmlFor="ws-desc">Description</label>
+            <label className="modal__label" htmlFor="ws-desc">Description (optional)</label>
             <textarea
               id="ws-desc"
               className="modal__textarea"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               maxLength={500}
-              required
               rows={3}
             />
           </div>
@@ -284,20 +284,15 @@ function NewWorkspaceModal({ onClose, onCreate, defaultDueDate = null }) {
 
             <div className="modal__field">
               <label className="modal__label" htmlFor="ws-max">Max members</label>
-              <div className="modal__select-wrap">
-                <select
-                  id="ws-max"
-                  className="modal__select"
-                  value={maxMembers}
-                  onChange={(e) => setMaxMembers(e.target.value)}
-                >
-                  <option value="">No limit</option>
-                  {MAX_MEMBER_OPTIONS.filter(Boolean).map((n) => (
-                    <option key={n} value={n}>{n}</option>
-                  ))}
-                </select>
-                <ChevronDown />
-              </div>
+              <input
+                id="ws-max"
+                type="text"
+                inputMode="numeric"
+                className="modal__input"
+                placeholder="No limit"
+                value={maxMembers}
+                onChange={(e) => setMaxMembers(e.target.value)}
+              />
             </div>
           </div>
 
@@ -349,14 +344,6 @@ function ChevronRight() {
   return (
     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
       <polyline points="9 18 15 12 9 6" />
-    </svg>
-  )
-}
-
-function ChevronDown() {
-  return (
-    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true" className="modal__select-chevron">
-      <polyline points="6 9 12 15 18 9" />
     </svg>
   )
 }

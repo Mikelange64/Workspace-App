@@ -31,5 +31,6 @@ backend/populate_images/*
 
 # --- Personal Notes ---
 SETUP.md
-.future.txt
+.future.md
 .go_live.md
+.roadmap.md
