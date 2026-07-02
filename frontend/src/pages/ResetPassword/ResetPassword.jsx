@@ -32,7 +32,7 @@ function ResetPassword() {
   if (!token) {
     return (
       <div className="auth-page">
-        <div className="auth-card">
+        <div className="auth-page__panel">
           <h1 className="auth-card__heading">Invalid link</h1>
           <p className="auth-card__subtext">This password reset link is missing or malformed.</p>
           <p className="auth-card__footer">
@@ -45,7 +45,7 @@ function ResetPassword() {
 
   return (
     <div className="auth-page">
-      <div className="auth-card">
+      <div className="auth-page__panel">
         <h1 className="auth-card__heading">Set new password</h1>
         <p className="auth-card__subtext">Choose a new password for your account.</p>
 

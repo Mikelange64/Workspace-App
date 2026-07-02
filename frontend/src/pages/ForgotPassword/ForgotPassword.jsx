@@ -26,7 +26,7 @@ function ForgotPassword() {
   if (sent) {
     return (
       <div className="auth-page">
-        <div className="auth-card">
+        <div className="auth-page__panel">
           <h1 className="auth-card__heading">Check your email</h1>
           <p className="auth-card__subtext">
             If an account exists for <strong>{email}</strong>, you&apos;ll receive a reset link shortly.
@@ -41,7 +41,7 @@ function ForgotPassword() {
 
   return (
     <div className="auth-page">
-      <div className="auth-card">
+      <div className="auth-page__panel">
         <h1 className="auth-card__heading">Reset your password</h1>
         <p className="auth-card__subtext">Enter your email and we&apos;ll send you a reset link.</p>
 

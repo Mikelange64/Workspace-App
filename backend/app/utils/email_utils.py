@@ -23,8 +23,10 @@ def send_email(
         message.add_alternative(html_content, subtype="html")  # or clients that do render html
 
     # Port 465 = implicit SSL (SMTP_SSL); port 587 = STARTTLS upgrade (SMTP + starttls())
+    # timeout is required: without it a blocked/slow outbound connection hangs the
+    # request indefinitely, which is especially bad with a single uvicorn worker.
     if settings.mail_port == 465:
-        with smtplib.SMTP_SSL(settings.mail_host, settings.mail_port) as smtp:
+        with smtplib.SMTP_SSL(settings.mail_host, settings.mail_port, timeout=10) as smtp:
             if settings.mail_username and settings.mail_password:
                 smtp.login(
                     settings.mail_username,
@@ -32,7 +34,7 @@ def send_email(
                 )
             smtp.send_message(message)
     else:
-        with smtplib.SMTP(settings.mail_host, settings.mail_port) as smtp:
+        with smtplib.SMTP(settings.mail_host, settings.mail_port, timeout=10) as smtp:
             if settings.mail_use_tls:
                 smtp.starttls()
             if settings.mail_username and settings.mail_password:
