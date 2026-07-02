@@ -9,6 +9,7 @@ function HomeCanvas({
   mascotSlot,
   onSelectWorkspace,
   onNewWorkspace,
+  onComplete,
   onSelectTask,
 }) {
   return (
@@ -18,11 +19,11 @@ function HomeCanvas({
         membersByWorkspaceId={membersByWorkspaceId}
         onSelectWorkspace={onSelectWorkspace}
         onNewWorkspace={onNewWorkspace}
+        onComplete={onComplete}
         mascotSlot={mascotSlot}
       />
       <ComingUpSection
         tasks={comingUpTasks}
-        hasActiveWorkspaces={workspaces.length > 0}
         onSelectTask={onSelectTask}
       />
     </div>

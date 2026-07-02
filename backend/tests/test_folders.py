@@ -201,7 +201,7 @@ def test_delete_folder_nullifies_workspace_folder_id(
         headers=user_auth_headers,
     )
     client.delete(f"{folderprefix}/{folder['id']}", headers=user_auth_headers)
-    response = client.get(f"/api/workspaces/{workspace['id']}")
+    response = client.get(f"/api/workspaces/{workspace['id']}", headers=user_auth_headers)
     assert response.json()["folder_id"] is None
 
 

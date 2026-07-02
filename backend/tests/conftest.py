@@ -87,9 +87,14 @@ def client(db_session):
 
 
 @pytest.fixture
-def user(client):
-    """Create and return a default test user."""
-    return create_test_user(client)
+def user(client, db_session):
+    """Create and return a default test user (pre-verified to bypass email flow)."""
+    from app.models import User as UserModel
+    user_data = create_test_user(client)
+    u = db_session.get(UserModel, user_data["id"])
+    u.is_verified = True
+    db_session.flush()
+    return user_data
 
 
 @pytest.fixture
@@ -111,9 +116,14 @@ def workspace(client, user_token):
 
 
 @pytest.fixture
-def second_user(client):
-    """Create and return a second user with different credentials."""
-    return create_test_user(client, username="user2", email="user2@example.com")
+def second_user(client, db_session):
+    """Create and return a second user (pre-verified to bypass email flow)."""
+    from app.models import User as UserModel
+    user_data = create_test_user(client, username="user2", email="user2@example.com")
+    u = db_session.get(UserModel, user_data["id"])
+    u.is_verified = True
+    db_session.flush()
+    return user_data
 
 
 @pytest.fixture

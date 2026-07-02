@@ -272,7 +272,7 @@ function NewWorkspaceModal({ onClose, onCreate, defaultDueDate = null }) {
                   )}
                 </div>
               </div>
-              {!hasDate && <span className="nwm-no-deadline">No deadline</span>}
+              <span className="nwm-no-deadline" style={{ visibility: hasDate ? 'hidden' : 'visible' }}>No deadline</span>
               {showCalPop && (
                 <MiniCalPopover
                   selectedDate={selectedDate}

@@ -101,8 +101,8 @@ def create_user(user: UserCreate, db: DbSession):
         send_verification_email(
             to_email=new_user.email, username=new_user.username, token=token
         )
-    except Exception as exc:
-        print(f"[mail] Failed to send verification email to {new_user.email}: {exc}")
+    except Exception:
+        pass
 
     return new_user
 
@@ -127,7 +127,7 @@ def login(
         .first()
     )
 
-    if not user or not verify_password(form_data.password, user.password_hash):
+    if not user or not user.is_verified or not  verify_password(form_data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect password or email/username",
@@ -299,8 +299,7 @@ def verify_email(request_data: EmailVerification, db: DbSession):
         db.execute(
             select(VerificationToken).where(VerificationToken.token_hash == token_hash)
         )
-        .scalars()
-        .first()
+        .scalars().first()
     )
 
     if not verification_token:
@@ -373,8 +372,8 @@ def forgot_password(db: DbSession, request_data: ForgotPasswordRequest):
             send_password_reset_email(
                 to_email=user.email, username=user.username, token=token
             )
-        except Exception as exc:
-            print(f"[mail] Failed to send password reset email to {user.email}: {exc}")
+        except Exception:
+            pass
 
     return {
         "message": "If an account exists with this email, you will receive password reset instructions"
@@ -455,7 +454,7 @@ def change_password(
 
 
 # ========================================================================================
-# OPERATIOS ON SUBRESOURCES
+# OPERATIONS ON SUBRESOURCES
 # ========================================================================================
 
 
@@ -474,13 +473,8 @@ def get_user_workspaces(current_user: CurrentUser, db: DbSession):
     return workspaces
 
 
-@router.get(
-    "/search", response_model=UserPublic, dependencies=[Depends(get_current_user)]
-)
-def search_user(
-    q: Annotated[str, Query(min_length=1)],
-    db: DbSession,
-):
+@router.get( "/search", response_model=UserPublic, dependencies=[Depends(get_current_user)])
+def search_user(q: Annotated[str, Query(min_length=1)], db: DbSession):
     user = db.execute(
         select(User).where(
             or_(
@@ -543,11 +537,9 @@ def upload_profile_picture(file: UploadFile, current_user: CurrentUser, db: DbSe
     return current_user
 
 
+
 @router.delete("/me/picture", response_model=UserPrivate)
-def delete_profile_picture(
-    current_user: CurrentUser,
-    db: DbSession,
-):
+def delete_profile_picture(current_user: CurrentUser, db: DbSession,):
     old_filename = current_user.image_file
 
     if old_filename is None:

@@ -1,5 +1,19 @@
 const MS_PER_DAY = 1000 * 60 * 60 * 24
 
+const MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+/** Returns "Jun 28" or "Jun 28, 2025" if the year differs from current year. */
+export function formatAbsoluteDate(dateStr) {
+  if (!dateStr) return ''
+  const d = new Date(dateStr)
+  const month = MONTH_ABBR[d.getMonth()]
+  const day = d.getDate()
+  const year = d.getFullYear()
+  return year === new Date().getFullYear()
+    ? `${month} ${day}`
+    : `${month} ${day}, ${year}`
+}
+
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 /** Whole days remaining until dueDate; negative if overdue. */

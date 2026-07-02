@@ -47,14 +47,9 @@ function Login() {
 
   return (
     <div className="auth-page">
-      <div className="auth-card">
-        <div className="auth-card__mascot">
-          {/* Swap this div for <img src={filoBelloWaving} alt="Filobelo waving" /> when the SVG is ready */}
-          <div className="auth-card__mascot-placeholder" aria-hidden="true">👋</div>
-        </div>
-
+      <div className="auth-page__panel">
         <h1 className="auth-card__heading">Welcome back</h1>
-        <p className="auth-card__subtext">Sign in to continue to WorkspaceApp</p>
+        <p className="auth-card__subtext">Sign in to continue to Filobelo</p>
 
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
           <div className="auth-form__group">

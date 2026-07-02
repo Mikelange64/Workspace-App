@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { verifyEmail } from '../../api/client'
+import filobeloProud from '../../assets/mascott/filobelo_proud.svg'
 import '../auth.css'
 
 function VerifyEmail() {
@@ -39,6 +40,9 @@ function VerifyEmail() {
     return (
       <div className="auth-page">
         <div className="auth-card">
+          <div className="auth-card__mascot">
+            <img src={filobeloProud} alt="" className="auth-card__mascot-img" />
+          </div>
           <h1 className="auth-card__heading">Email verified</h1>
           <p className="auth-card__subtext">Your account is now active. You can sign in.</p>
           <p className="auth-card__footer">

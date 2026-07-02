@@ -87,6 +87,7 @@ def test_reset_password_success(client: TestClient, db_session):
     token = secrets.token_urlsafe(32)
     token_hash = hash_reset_token(token)
     user = db_session.execute(select(User)).scalars().first()
+    user.is_verified = True
     expires_at = datetime.now(UTC) + timedelta(hours=1)
     reset_token = PasswordResetToken(
         user_id=user.id, token_hash=token_hash, expires_at=expires_at

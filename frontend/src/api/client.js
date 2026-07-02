@@ -1,8 +1,8 @@
 const BASE_URL = import.meta.env.VITE_API_URL
 
 const STORAGE_KEYS = {
-  access: 'wa_access_token',
-  refresh: 'wa_refresh_token',
+  access: 'filobelo_access_token',
+  refresh: 'filobelo_refresh_token',
 }
 
 export function getTokens() {
@@ -134,8 +134,21 @@ export function deleteWorkspace(id) {
   return authFetch(`/workspaces/${id}/`, { method: 'DELETE' })
 }
 
+export function completeWorkspace(id) {
+  return authFetch(`/workspaces/${id}/complete`, { method: 'PATCH' })
+}
+
+export function reopenWorkspace(id) {
+  return authFetch(`/workspaces/${id}/reopen`, { method: 'PATCH' })
+}
+
 export function leaveWorkspace(id) {
   return authFetch(`/workspaces/${id}/members/me`, { method: 'DELETE' })
+}
+
+// Workspace lists
+export function getCompletedWorkspaces(skip = 0, limit = 20) {
+  return authFetch(`/workspaces/completed?skip=${skip}&limit=${limit}`)
 }
 
 // Workspace detail
@@ -149,6 +162,13 @@ export function getMembersWithRoles(workspaceId) {
 
 export function inviteMember(workspaceId, userId) {
   return authFetch(`/workspaces/${workspaceId}/members/${userId}`, { method: 'PATCH' })
+}
+
+export function inviteExternal(workspaceId, email) {
+  return authFetch(`/workspaces/${workspaceId}/invite/external`, {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  })
 }
 
 export function promoteToAdmin(workspaceId, userId) {

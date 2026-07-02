@@ -39,6 +39,8 @@ class WorkspaceResponse(WorkspaceBase):
     members           : list[UserPublic]
     tasks             : list[TaskSummary]
     current_user_role : str | None = None
+    is_completed      : bool = False
+    completed_at      : datetime | None = None
 
 
 class PaginatedWorkspaceResponse(Base):
@@ -47,6 +49,10 @@ class PaginatedWorkspaceResponse(Base):
     skip       : int
     limit      : int
     has_more   : bool
+
+
+class InviteExternalRequest(Base):
+    email: EmailStr
 
 
 class WorkspaceUpdate(WorkspaceBase):

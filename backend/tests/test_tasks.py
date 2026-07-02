@@ -1,6 +1,5 @@
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.exc import IntegrityError
 
 from tests.auth_helpers import (
     add_workspace_member,
@@ -9,6 +8,7 @@ from tests.auth_helpers import (
     create_test_user,
     create_workspace,
     login_user,
+    verify_user_in_db,
 )
 
 taskprefix = "/api/workspaces"
@@ -127,11 +127,12 @@ def test_create_task_validation_error(
     ],
 )
 def test_create_task_auth_failures(
-    client: TestClient, user_token, workspace, token, expected_status
+    client: TestClient, db_session, user_token, workspace, token, expected_status
 ):
     headers = None
     if token == "outsider":
         create_test_user(client, username="outsider", email="outsider@example.com")
+        verify_user_in_db(db_session, "outsider@example.com")
         token = login_user(client, email="outsider@example.com")
         headers = auth_header(token)
     kwargs = {"headers": headers} if headers else {}
@@ -201,10 +202,11 @@ def test_get_tasks_multiple(
         pytest.param(None, 401, id="no_auth"),
     ],
 )
-def test_get_tasks_auth_failures(client: TestClient, workspace, token, expected_status):
+def test_get_tasks_auth_failures(client: TestClient, db_session, workspace, token, expected_status):
     headers = None
     if token == "outsider":
         create_test_user(client, username="outsider", email="outsider@example.com")
+        verify_user_in_db(db_session, "outsider@example.com")
         token = login_user(client, email="outsider@example.com")
         headers = auth_header(token)
     kwargs = {"headers": headers} if headers else {}
@@ -245,10 +247,11 @@ def test_get_task_nonexistent(client: TestClient, user_auth_headers, workspace):
         pytest.param(None, 401, id="no_auth"),
     ],
 )
-def test_get_task_auth_failures(client: TestClient, task, token, expected_status):
+def test_get_task_auth_failures(client: TestClient, db_session, task, token, expected_status):
     headers = None
     if token == "outsider":
         create_test_user(client, username="outsider", email="outsider@example.com")
+        verify_user_in_db(db_session, "outsider@example.com")
         token = login_user(client, email="outsider@example.com")
         headers = auth_header(token)
     kwargs = {"headers": headers} if headers else {}
@@ -318,10 +321,11 @@ def test_update_task_nonexistent(client: TestClient, user_auth_headers, workspac
         pytest.param(None, 401, id="no_auth"),
     ],
 )
-def test_update_task_auth_failures(client: TestClient, task, token, expected_status):
+def test_update_task_auth_failures(client: TestClient, db_session, task, token, expected_status):
     headers = None
     if token == "outsider":
         create_test_user(client, username="outsider", email="outsider@example.com")
+        verify_user_in_db(db_session, "outsider@example.com")
         token = login_user(client, email="outsider@example.com")
         headers = auth_header(token)
     kwargs = {"headers": headers} if headers else {}
@@ -383,10 +387,11 @@ def test_full_update_task_as_owner_all_fields(
 
 
 def test_full_update_task_non_owner_member(
-    client: TestClient, user_token, user_auth_headers, task
+    client: TestClient, db_session, user_token, user_auth_headers, task
 ):
     other_user = create_test_user(client, username="other", email="other@example.com")
     add_workspace_member(client, user_token, task["workspace_id"], other_user["id"])
+    verify_user_in_db(db_session, "other@example.com")
     other_token = login_user(client, email="other@example.com")
     response = client.put(
         f"{taskprefix}/{task['workspace_id']}/tasks/{task['id']}",
@@ -411,11 +416,12 @@ def test_full_update_task_non_owner_member(
     ],
 )
 def test_full_update_task_auth_failures(
-    client: TestClient, task, token, expected_status
+    client: TestClient, db_session, task, token, expected_status
 ):
     headers = None
     if token == "outsider":
         create_test_user(client, username="outsider", email="outsider@example.com")
+        verify_user_in_db(db_session, "outsider@example.com")
         token = login_user(client, email="outsider@example.com")
         headers = auth_header(token)
     kwargs = {"headers": headers} if headers else {}
@@ -501,10 +507,11 @@ def test_delete_task_as_non_admin_member(
         pytest.param(None, 401, id="no_auth"),
     ],
 )
-def test_delete_task_auth_failures(client: TestClient, task, token, expected_status):
+def test_delete_task_auth_failures(client: TestClient, db_session, task, token, expected_status):
     headers = None
     if token == "outsider":
         create_test_user(client, username="outsider", email="outsider@example.com")
+        verify_user_in_db(db_session, "outsider@example.com")
         token = login_user(client, email="outsider@example.com")
         headers = auth_header(token)
     kwargs = {"headers": headers} if headers else {}
@@ -536,11 +543,12 @@ def test_complete_task_as_owner_success(client: TestClient, user_auth_headers, t
 
 
 def test_complete_task_as_admin_success(
-    client: TestClient, user_token, user_auth_headers, workspace
+    client: TestClient, db_session, user_token, user_auth_headers, workspace
 ):
     """Admin (non-owner) can also toggle task completion."""
     other_user = create_test_user(client, username="other", email="other@example.com")
     add_workspace_member(client, user_token, workspace["id"], other_user["id"])
+    verify_user_in_db(db_session, "other@example.com")
     other_token = login_user(client, email="other@example.com")
     task = create_task(client, other_token, workspace["id"])
     response = client.patch(
@@ -551,17 +559,19 @@ def test_complete_task_as_admin_success(
     assert response.json()["is_completed"] is True
 
 
-def test_complete_task_non_owner_non_admin_blocked(
-    client: TestClient, user_token, user_auth_headers, task
+def test_complete_task_any_member_allowed(
+    client: TestClient, db_session, user_token, user_auth_headers, task
 ):
     other_user = create_test_user(client, username="other", email="other@example.com")
     add_workspace_member(client, user_token, task["workspace_id"], other_user["id"])
+    verify_user_in_db(db_session, "other@example.com")
     other_token = login_user(client, email="other@example.com")
     response = client.patch(
         f"{taskprefix}/{task['workspace_id']}/tasks/{task['id']}/complete",
         headers=auth_header(other_token),
     )
-    assert response.status_code == 403
+    assert response.status_code == 200
+    assert response.json()["is_completed"] is True
 
 
 def test_complete_task_nonexistent(client: TestClient, user_auth_headers, workspace):
@@ -579,10 +589,11 @@ def test_complete_task_nonexistent(client: TestClient, user_auth_headers, worksp
         pytest.param(None, 401, id="no_auth"),
     ],
 )
-def test_complete_task_auth_failures(client: TestClient, task, token, expected_status):
+def test_complete_task_auth_failures(client: TestClient, db_session, task, token, expected_status):
     headers = None
     if token == "outsider":
         create_test_user(client, username="outsider", email="outsider@example.com")
+        verify_user_in_db(db_session, "outsider@example.com")
         token = login_user(client, email="outsider@example.com")
         headers = auth_header(token)
     kwargs = {"headers": headers} if headers else {}
@@ -639,6 +650,7 @@ def test_make_owner_target_not_member(client: TestClient, user_auth_headers, tas
 )
 def test_make_owner_auth_failures(
     client: TestClient,
+    db_session,
     user_token,
     user_auth_headers,
     task,
@@ -655,6 +667,7 @@ def test_make_owner_auth_failures(
         add_workspace_member(
             client, user_token, task["workspace_id"], regular_user["id"]
         )
+        verify_user_in_db(db_session, "regular@example.com")
         regular_token = login_user(client, email="regular@example.com")
         headers = auth_header(regular_token)
     kwargs = {"headers": headers} if headers else {}
@@ -679,96 +692,3 @@ def test_make_owner_nonexistent_task(
 
 
 # ========================================================================================
-# MOVE TASK
-# ========================================================================================
-
-
-def test_move_task_success(
-    client: TestClient, user_token, user_auth_headers, workspace, task
-):
-    workspace_b = create_workspace(client, user_token, title="Workspace B")
-    response = client.patch(
-        f"{taskprefix}/{workspace['id']}/tasks/{task['id']}/move",
-        json={"workspace_id": workspace_b["id"]},
-        headers=user_auth_headers,
-    )
-    assert response.status_code == 200
-    assert response.json()["id"] == workspace_b["id"]
-
-
-def test_move_task_verified(
-    client: TestClient, user_token, user_auth_headers, workspace, task
-):
-    workspace_b = create_workspace(client, user_token, title="Workspace B")
-    client.patch(
-        f"{taskprefix}/{workspace['id']}/tasks/{task['id']}/move",
-        json={"workspace_id": workspace_b["id"]},
-        headers=user_auth_headers,
-    )
-    # Task should be in workspace_b's task list
-    response = client.get(
-        f"{taskprefix}/{workspace_b['id']}/tasks/", headers=user_auth_headers
-    )
-    assert any(t["id"] == task["id"] for t in response.json()["tasks"])
-    # Task should no longer be in workspace_a's task list
-    response = client.get(
-        f"{taskprefix}/{workspace['id']}/tasks/", headers=user_auth_headers
-    )
-    assert not any(t["id"] == task["id"] for t in response.json()["tasks"])
-
-
-@pytest.mark.parametrize(
-    "token,expected_status",
-    [
-        pytest.param("regular", 403, id="non_admin"),
-        pytest.param(None, 401, id="no_auth"),
-    ],
-)
-def test_move_task_auth_failures(
-    client: TestClient,
-    user_token,
-    user_auth_headers,
-    workspace,
-    task,
-    token,
-    expected_status,
-):
-    workspace_b = create_workspace(client, user_token, title="Workspace B")
-    headers = None
-    if token == "regular":
-        regular_user = create_test_user(
-            client, username="regular", email="regular@example.com"
-        )
-        add_workspace_member(client, user_token, workspace["id"], regular_user["id"])
-        regular_token = login_user(client, email="regular@example.com")
-        headers = auth_header(regular_token)
-    kwargs = {"headers": headers} if headers else {}
-    response = client.patch(
-        f"{taskprefix}/{workspace['id']}/tasks/{task['id']}/move",
-        json={"workspace_id": workspace_b["id"]},
-        **kwargs,
-    )
-    assert response.status_code == expected_status
-
-
-def test_move_task_nonexistent_target_workspace(
-    client: TestClient, user_auth_headers, task
-):
-    with pytest.raises(IntegrityError):
-        client.patch(
-            f"{taskprefix}/{task['workspace_id']}/tasks/{task['id']}/move",
-            json={"workspace_id": 99999},
-            headers=user_auth_headers,
-        )
-
-
-def test_move_task_nonexistent_task(
-    client: TestClient, user_token, user_auth_headers, workspace
-):
-    workspace_b = create_workspace(client, user_token, title="Workspace B")
-    response = client.patch(
-        f"{taskprefix}/{workspace['id']}/tasks/99999/move",
-        json={"workspace_id": workspace_b["id"]},
-        headers=user_auth_headers,
-    )
-    assert response.status_code == 404

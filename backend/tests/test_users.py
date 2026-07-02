@@ -6,6 +6,7 @@ from tests.auth_helpers import (
     create_test_user,
     create_workspace,
     login_user,
+    verify_user_in_db,
 )
 
 prefix = "/api/users"
@@ -128,8 +129,9 @@ def test_create_user_duplicate_username(client: TestClient):
         ),
     ],
 )
-def test_login_success(client: TestClient, create_kwargs, login_username):
+def test_login_success(client: TestClient, db_session, create_kwargs, login_username):
     create_test_user(client, password="testpassword123", **create_kwargs)
+    verify_user_in_db(db_session, create_kwargs.get("email", "test@example.com"))
 
     response = client.post(
         f"{prefix}/login",
@@ -368,9 +370,10 @@ def test_update_same_email_is_noop(client: TestClient, user_auth_headers):
     assert response.status_code == 200
 
 
-def test_update_email_case_change_is_same_user(client: TestClient):
+def test_update_email_case_change_is_same_user(client: TestClient, db_session):
     """Changing only the case of the email should be treated as no change (no conflict)."""
     create_test_user(client, email="test@example.com")
+    verify_user_in_db(db_session, "test@example.com")
     token = login_user(client)
 
     response = client.patch(
@@ -399,10 +402,11 @@ def test_update_email_case_change_is_same_user(client: TestClient):
     ],
 )
 def test_update_user_conflict(
-    client: TestClient, field, conflict_value, expected_message
+    client: TestClient, db_session, field, conflict_value, expected_message
 ):
     create_test_user(client, username="user1", email="user1@example.com")
     create_test_user(client, username="user2", email="user2@example.com")
+    verify_user_in_db(db_session, "user2@example.com")
     token = login_user(client, email="user2@example.com")
 
     response = client.patch(

@@ -135,3 +135,38 @@
   color: var(--color-text-muted);
   font-size: 0.58rem;
 }
+
+/* Right-click context menu */
+.ws-ctx-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 160px;
+  background: var(--color-bg-overlay);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-overlay);
+  padding: 4px 0;
+  outline: none;
+}
+
+.ws-ctx-menu__item {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: 0.875rem;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ws-ctx-menu__item:hover {
+  background: var(--color-bg-canvas-hover);
+}
+
+.ws-ctx-menu__item--complete {
+  color: var(--color-brand-primary);
+  font-weight: 600;
+}

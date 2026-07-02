@@ -7,7 +7,7 @@ from .auth import (
     Token,
 )
 from .folders import FolderCreate, FolderResponse, FolderUpdate
-from .tasks import PaginatedTaskResponse, TaskCreate, TaskFullUpdate, TaskMove, TaskResponse, TaskSummary, TaskUpdate
+from .tasks import PaginatedTaskResponse, TaskCreate, TaskFullUpdate, TaskResponse, TaskSummary, TaskUpdate
 from .users import (
     PaginatedSuperUserResponse,
     SuperUserResponse,
@@ -18,6 +18,7 @@ from .users import (
     WorkspaceMemberPublic,
 )
 from .workspaces import (
+    InviteExternalRequest,
     PaginatedWorkspaceResponse,
     WorkspaceCreate,
     WorkspaceResponse,
@@ -28,7 +29,6 @@ __all__ = [
     # TASK
     "TaskCreate",
     "TaskFullUpdate",
-    "TaskMove",
     "TaskResponse",
     "TaskSummary",
     "PaginatedTaskResponse",
@@ -40,6 +40,7 @@ __all__ = [
     "FolderUpdate",
 
     # WORKSPACE
+    "InviteExternalRequest",
     "WorkspaceCreate",
     "WorkspaceResponse",
     "WorkspaceUpdate",

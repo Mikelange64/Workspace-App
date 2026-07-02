@@ -17,42 +17,37 @@ function getTaskUrgency(dueDate) {
   return 'success'
 }
 
-function ComingUpSection({ tasks = [], hasActiveWorkspaces = false, onSelectTask }) {
-  if (!hasActiveWorkspaces) return null
+function ComingUpSection({ tasks = [], onSelectTask }) {
+  if (tasks.length === 0) return null
 
   const sorted = [...tasks].sort(byDueDate)
 
   return (
     <section className="coming-up" aria-label="Upcoming tasks">
       <h2 className="coming-up__heading">Upcoming tasks</h2>
-
-      {sorted.length === 0 ? (
-        <p className="coming-up__empty">No tasks yet — add tasks inside a workspace to see them here.</p>
-      ) : (
-        <ul className="coming-up__list">
-          {sorted.map((task) => {
-            const urgency = getTaskUrgency(task.dueDate)
-            return (
-              <li key={task.id}>
-                <button
-                  type="button"
-                  className="coming-up__item"
-                  onClick={() => onSelectTask?.(task.id)}
-                >
-                  <StatusDot urgency={urgency} />
-                  <span className="coming-up__content">
-                    <span className="coming-up__title">{task.title}</span>
-                    <span className="coming-up__workspace">{task.workspaceTitle}</span>
-                  </span>
-                  <span className={`coming-up__due coming-up__due--${urgency}`}>
-                    {task.dueDate ? formatDueDate(task.dueDate) : 'No deadline'}
-                  </span>
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-      )}
+      <ul className="coming-up__list">
+        {sorted.map((task) => {
+          const urgency = getTaskUrgency(task.dueDate)
+          return (
+            <li key={task.id}>
+              <button
+                type="button"
+                className="coming-up__item"
+                onClick={() => onSelectTask?.(task.id)}
+              >
+                <StatusDot urgency={urgency} />
+                <span className="coming-up__content">
+                  <span className="coming-up__title">{task.title}</span>
+                  <span className="coming-up__workspace">{task.workspaceTitle}</span>
+                </span>
+                <span className={`coming-up__due coming-up__due--${urgency}`}>
+                  {task.dueDate ? formatDueDate(task.dueDate) : 'No deadline'}
+                </span>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
     </section>
   )
 }

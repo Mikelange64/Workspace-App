@@ -22,11 +22,9 @@ export function isWorkspaceLate({ dueDate, progress = 0 }) {
   return new Date(dueDate).getTime() < Date.now()
 }
 
-/** Active = not complete, not archived. Used to populate the Home canvas. */
+/** Active = not explicitly completed, not archived. Uses the is_completed flag. */
 export function getActiveWorkspaces(workspaces) {
-  return workspaces.filter(
-    (ws) => !ws.isArchived && getWorkspaceStatus(ws) !== WORKSPACE_STATUS.COMPLETE,
-  )
+  return workspaces.filter((ws) => !ws.isArchived && !ws.isCompleted)
 }
 
 /** Single urgency level for a workspace — drives status dot and card accent.

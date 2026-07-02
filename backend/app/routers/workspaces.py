@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -8,7 +9,9 @@ from app.auth import CurrentUser
 from app.database import DbSession
 from app.dependencies import get_target_membership, require_admin, require_membership
 from app.models import User, Workspace, WorkspaceMember
+from app.config import settings
 from app.schemas import (
+    InviteExternalRequest,
     PaginatedWorkspaceResponse,
     UserPublic,
     WorkspaceCreate,
@@ -17,6 +20,7 @@ from app.schemas import (
     WorkspaceUpdate,
 )
 from app.utils import get_workspace_by_id
+from app.utils.email_utils import send_join_invite_email, send_member_added_email
 
 router = APIRouter(tags=["workspaces"])
 
@@ -103,6 +107,109 @@ def create_workspace(
     )
 
 
+@router.get("/completed", response_model=PaginatedWorkspaceResponse)
+def get_completed_workspaces(
+    current_user: CurrentUser,
+    db: DbSession,
+    skip: int = 0,
+    limit: int = 20,
+):
+    base = (
+        select(Workspace)
+        .join(WorkspaceMember, WorkspaceMember.workspace_id == Workspace.id)
+        .where(
+            WorkspaceMember.user_id == current_user.id,
+            Workspace.is_completed.is_(True),
+        )
+        .order_by(Workspace.completed_at.desc())
+    )
+
+    total = db.execute(select(func.count()).select_from(base.subquery())).scalar() or 0
+
+    workspaces = (
+        db.execute(
+            base.options(joinedload(Workspace.members), joinedload(Workspace.tasks))
+            .offset(skip)
+            .limit(limit)
+        )
+        .scalars().unique().all()
+    )
+
+    workspace_ids = [ws.id for ws in workspaces]
+    role_map = {
+        ws_id: role
+        for ws_id, role in db.execute(
+            select(WorkspaceMember.workspace_id, WorkspaceMember.role).where(
+                WorkspaceMember.workspace_id.in_(workspace_ids),
+                WorkspaceMember.user_id == current_user.id,
+            )
+        ).all()
+    }
+
+    return PaginatedWorkspaceResponse(
+        workspaces=[
+            WorkspaceResponse.model_validate(ws).model_copy(
+                update={"current_user_role": role_map.get(ws.id)}
+            )
+            for ws in workspaces
+        ],
+        total=total,
+        skip=skip,
+        limit=limit,
+        has_more=skip + limit < total,
+    )
+
+
+@router.patch("/{workspace_id}/complete", response_model=WorkspaceResponse)
+def complete_workspace(
+    workspace_id: int,
+    db: DbSession,
+    member: Annotated[WorkspaceMember, Depends(require_admin)],
+):
+    workspace = db.execute(
+        select(Workspace)
+        .options(joinedload(Workspace.members), joinedload(Workspace.tasks))
+        .where(Workspace.id == workspace_id)
+    ).scalars().first()
+
+    if not workspace:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
+
+    workspace.is_completed = True
+    workspace.completed_at = datetime.now(UTC)
+    db.commit()
+    db.refresh(workspace)
+
+    return WorkspaceResponse.model_validate(workspace).model_copy(
+        update={"current_user_role": member.role}
+    )
+
+
+@router.patch("/{workspace_id}/reopen", response_model=WorkspaceResponse)
+def reopen_workspace(
+    workspace_id: int,
+    db: DbSession,
+    member: Annotated[WorkspaceMember, Depends(require_admin)],
+):
+    workspace = db.execute(
+        select(Workspace)
+        .options(joinedload(Workspace.members), joinedload(Workspace.tasks))
+        .where(Workspace.id == workspace_id)
+    ).scalars().first()
+
+    if not workspace:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
+
+    workspace.is_completed = False
+    workspace.completed_at = None
+    db.commit()
+    db.refresh(workspace)
+
+    return WorkspaceResponse.model_validate(workspace).model_copy(
+        update={"current_user_role": member.role}
+    )
+
+
 @router.get("/{workspace_id}", response_model=WorkspaceResponse)
 def get_workspace(
     workspace_id: int, db: DbSession, current_user: CurrentUser
@@ -137,7 +244,7 @@ def get_workspace(
 @router.patch(
     "/{workspace_id}",
     response_model=WorkspaceResponse,
-    dependencies=[Depends(require_membership)],
+    dependencies=[Depends(require_admin)],
 )
 def update_workspace_partial(
     workspace_id: int, workspace_data: WorkspaceUpdate, db: DbSession
@@ -156,7 +263,7 @@ def update_workspace_partial(
 @router.put(
     "/{workspace_id}/",
     response_model=WorkspaceResponse,
-    dependencies=[Depends(require_membership)],
+    dependencies=[Depends(require_admin)],
 )
 def update_workspace_full(
     workspace_id: int, workspace_data: WorkspaceCreate, db: DbSession
@@ -221,16 +328,71 @@ def get_members(workspace_id: int, db: DbSession):
     response_model=WorkspaceResponse,
     dependencies=[Depends(require_admin)],
 )
-def add_user(workspace_id: int, user_id: int, db: DbSession):
+def add_user(workspace_id: int, user_id: int, current_user: CurrentUser, db: DbSession):
     if get_target_membership(workspace_id, user_id, db):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="User already in the workspace"
         )
 
+    target_user = db.execute(select(User).where(User.id == user_id)).scalar_one_or_none()
+    if not target_user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    workspace = get_workspace_by_id(workspace_id, db)
+
     db.add(WorkspaceMember(user_id=user_id, workspace_id=workspace_id))
     db.commit()
 
+    try:
+        send_member_added_email(
+            to_email=target_user.email,
+            invitee_username=target_user.username,
+            inviter_username=current_user.username,
+            workspace_title=workspace.title,
+            workspace_url=f"{settings.frontend_url}/workspaces/{workspace_id}",
+        )
+    except Exception:
+        pass
+
     return get_workspace_by_id(workspace_id, db)
+
+
+@router.post(
+    "/{workspace_id}/invite/external",
+    dependencies=[Depends(require_admin)],
+)
+def invite_external(
+    workspace_id: int,
+    body: InviteExternalRequest,
+    current_user: CurrentUser,
+    db: DbSession,
+):
+    existing_user = db.execute(
+        select(User).where(func.lower(User.email) == body.email.lower())
+    ).scalar_one_or_none()
+
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This email belongs to an existing Filobelo user. Search for them by username or email to add them.",
+        )
+
+    workspace = get_workspace_by_id(workspace_id, db)
+
+    try:
+        send_join_invite_email(
+            to_email=body.email,
+            inviter_username=current_user.username,
+            workspace_title=workspace.title,
+            register_url=f"{settings.frontend_url}/register",
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send invitation email.",
+        )
+
+    return {"message": f"Invitation sent to {body.email}"}
 
 
 @router.patch(

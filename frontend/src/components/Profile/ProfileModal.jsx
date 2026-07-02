@@ -22,7 +22,7 @@ function CloseIcon() {
   )
 }
 
-function AccountPanel({ user, refreshUser, logout, onClose }) {
+function AccountPanel({ user, refreshUser, logout, onClose, onToast }) {
   const avatarUrl = toAvatarUrl(user.image_path)
   const initials = user.username?.[0]?.toUpperCase() ?? '?'
   const fileRef = useRef(null)
@@ -65,7 +65,7 @@ function AccountPanel({ user, refreshUser, logout, onClose }) {
       await uploadAvatarRequest(file)
       await refreshUser()
     } catch (err) {
-      alert(err.detail ?? 'Could not upload picture')
+      onToast?.(err.detail ?? 'Could not upload picture')
     } finally {
       setAvatarLoading(false)
       e.target.value = ''
@@ -78,7 +78,7 @@ function AccountPanel({ user, refreshUser, logout, onClose }) {
       await removeAvatar()
       await refreshUser()
     } catch (err) {
-      alert(err.detail ?? 'Could not remove picture')
+      onToast?.(err.detail ?? 'Could not remove picture')
     } finally {
       setAvatarLoading(false)
     }
@@ -95,7 +95,7 @@ function AccountPanel({ user, refreshUser, logout, onClose }) {
       logout()
       onClose()
     } catch (err) {
-      alert(err.detail ?? 'Could not delete account')
+      onToast?.(err.detail ?? 'Could not delete account')
       setDeleting(false)
       setConfirmDelete(false)
     }
@@ -300,7 +300,7 @@ const TABS = [
   { id: 'security', label: 'Security' },
 ]
 
-function ProfileModal({ onClose }) {
+function ProfileModal({ onClose, onToast }) {
   const { user, refreshUser, logout } = useAuth()
   const [activeTab, setActiveTab] = useState('account')
 
@@ -338,7 +338,7 @@ function ProfileModal({ onClose }) {
             <CloseIcon />
           </button>
           {activeTab === 'account' && (
-            <AccountPanel user={user} refreshUser={refreshUser} logout={logout} onClose={onClose} />
+            <AccountPanel user={user} refreshUser={refreshUser} logout={logout} onClose={onClose} onToast={onToast} />
           )}
           {activeTab === 'security' && <SecurityPanel />}
         </div>

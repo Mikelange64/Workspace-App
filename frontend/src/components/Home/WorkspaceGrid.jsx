@@ -6,7 +6,7 @@ import './WorkspaceGrid.css'
 
 const GRID_SIZE = 6
 
-function WorkspaceGrid({ workspaces, membersByWorkspaceId, onSelectWorkspace, onNewWorkspace, mascotSlot }) {
+function WorkspaceGrid({ workspaces, membersByWorkspaceId, onSelectWorkspace, onNewWorkspace, onComplete, mascotSlot }) {
   const active = sortByUrgency(getActiveWorkspaces(workspaces))
 
   if (active.length === 0) {
@@ -26,6 +26,7 @@ function WorkspaceGrid({ workspaces, membersByWorkspaceId, onSelectWorkspace, on
             workspace={ws}
             members={ws.members ?? membersByWorkspaceId?.[ws.id]}
             onSelect={onSelectWorkspace}
+            onComplete={onComplete}
           />
         ))}
         {showGhostCard && <NewWorkspaceCard onClick={onNewWorkspace} />}

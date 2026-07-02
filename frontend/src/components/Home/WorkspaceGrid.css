@@ -8,6 +8,8 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
+  min-height: calc(2 * 150px + 16px);
+  align-content: start;
 }
 
 .workspace-grid__more {

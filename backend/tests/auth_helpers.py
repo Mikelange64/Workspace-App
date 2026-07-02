@@ -1,6 +1,8 @@
 from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
 
 
 def create_test_user(
@@ -80,6 +82,16 @@ def login_user(
 
 def auth_header(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
+
+
+def verify_user_in_db(db_session: Session, email: str) -> None:
+    """Mark a test user as email-verified so they can log in (bypasses email flow in tests)."""
+    from app.models import User as UserModel
+    user = db_session.execute(
+        select(UserModel).where(func.lower(UserModel.email) == email.lower())
+    ).scalar_one()
+    user.is_verified = True
+    db_session.flush()
 
 
 def create_folder(

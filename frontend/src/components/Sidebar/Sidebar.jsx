@@ -202,10 +202,12 @@ function byMostRecent(a, b) {
 
 function Sidebar({
   workspaces = [],
+  completedCount = 0,
   folders = [],
   currentUser = null,
   onNewWorkspace,
   onOpenInbox,
+  onOpenCompleted,
   onSelectWorkspace,
   onTogglePin,
   onArchive,
@@ -331,6 +333,16 @@ function Sidebar({
           </>
         )}
       </div>
+
+      {completedCount > 0 && (
+        <>
+          <div className="sidebar__divider" />
+          <button type="button" className="sidebar__completed-btn" onClick={onOpenCompleted}>
+            <span className="sidebar__completed-label">Completed</span>
+            <span className="sidebar__completed-count">{completedCount}</span>
+          </button>
+        </>
+      )}
 
       <div className="sidebar__footer">
         <button type="button" className="sidebar__profile" onClick={onProfileClick}>

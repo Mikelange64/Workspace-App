@@ -7,7 +7,7 @@ from PIL import Image, ImageOps
 from app.config import settings
 
 
-def _get_s3_client():
+def _make_s3_client():
     return boto3.client(
         "s3",
         region_name=settings.s3_region,
@@ -23,6 +23,14 @@ def _get_s3_client():
         ),
         endpoint_url=settings.s3_endpoint_url,
     )
+
+_s3_client = None
+
+def _get_s3_client():
+    global _s3_client
+    if _s3_client is None:
+        _s3_client = _make_s3_client()
+    return _s3_client
 
 
 def process_profile_image(content: bytes) -> tuple[bytes, str]:

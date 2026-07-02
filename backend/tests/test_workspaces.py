@@ -1,6 +1,5 @@
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.exc import IntegrityError
 
 from tests.auth_helpers import (
     add_workspace_member,
@@ -8,6 +7,7 @@ from tests.auth_helpers import (
     create_test_user,
     create_workspace,
     login_user,
+    verify_user_in_db,
 )
 
 wsprefix = "/api/workspaces"
@@ -99,8 +99,8 @@ def test_create_workspace_no_auth(client: TestClient):
 # ========================================================================================
 
 
-def test_get_workspace_success(client: TestClient, workspace):
-    response = client.get(f"{wsprefix}/{workspace['id']}")
+def test_get_workspace_success(client: TestClient, workspace, user_auth_headers):
+    response = client.get(f"{wsprefix}/{workspace['id']}", headers=user_auth_headers)
     assert response.status_code == 200
     data = response.json()
     assert data["id"] == workspace["id"]
@@ -115,8 +115,8 @@ def test_get_workspace_success(client: TestClient, workspace):
         pytest.param(-1, id="negative_id"),
     ],
 )
-def test_get_workspace_not_found(client: TestClient, workspace_id):
-    response = client.get(f"{wsprefix}/{workspace_id}")
+def test_get_workspace_not_found(client: TestClient, user_auth_headers, workspace_id):
+    response = client.get(f"{wsprefix}/{workspace_id}", headers=user_auth_headers)
     assert response.status_code == 404
     assert response.json()["message"] == "Workspace not found"
 
@@ -181,11 +181,12 @@ def test_update_workspace_empty_body_noop(
     ],
 )
 def test_update_workspace_auth_failures(
-    client: TestClient, workspace, token, expected_status
+    client: TestClient, db_session, workspace, token, expected_status
 ):
     headers = None
     if token == "intruder":
         create_test_user(client, username="intruder", email="intruder@example.com")
+        verify_user_in_db(db_session, "intruder@example.com")
         intruder_token = login_user(client, email="intruder@example.com")
         headers = auth_header(intruder_token)
     kwargs = {"headers": headers} if headers else {}
@@ -247,11 +248,12 @@ def test_full_update_workspace_success(
     ],
 )
 def test_full_update_workspace_auth_failures(
-    client: TestClient, workspace, token, expected_status
+    client: TestClient, db_session, workspace, token, expected_status
 ):
     headers = None
     if token == "intruder":
         create_test_user(client, username="intruder", email="intruder@example.com")
+        verify_user_in_db(db_session, "intruder@example.com")
         intruder_token = login_user(client, email="intruder@example.com")
         headers = auth_header(intruder_token)
     kwargs = {"headers": headers} if headers else {}
@@ -301,7 +303,7 @@ def test_delete_workspace_removes_workspace(
     client: TestClient, user_auth_headers, workspace
 ):
     client.delete(f"{wsprefix}/{workspace['id']}/", headers=user_auth_headers)
-    response = client.get(f"{wsprefix}/{workspace['id']}")
+    response = client.get(f"{wsprefix}/{workspace['id']}", headers=user_auth_headers)
     assert response.status_code == 404
 
 
@@ -324,11 +326,12 @@ def test_delete_workspace_as_non_admin_member(
     ],
 )
 def test_delete_workspace_auth_failures(
-    client: TestClient, workspace, token, expected_status
+    client: TestClient, db_session, workspace, token, expected_status
 ):
     headers = None
     if token == "stranger":
         create_test_user(client, username="stranger", email="stranger@example.com")
+        verify_user_in_db(db_session, "stranger@example.com")
         token = login_user(client, email="stranger@example.com")
         headers = auth_header(token)
     kwargs = {"headers": headers} if headers else {}
@@ -380,11 +383,12 @@ def test_get_members_after_adding_user(
     ],
 )
 def test_get_members_auth_failures(
-    client: TestClient, workspace, token, expected_status
+    client: TestClient, db_session, workspace, token, expected_status
 ):
     headers = None
     if token == "outsider":
         create_test_user(client, username="outsider", email="outsider@example.com")
+        verify_user_in_db(db_session, "outsider@example.com")
         token = login_user(client, email="outsider@example.com")
         headers = auth_header(token)
     kwargs = {"headers": headers} if headers else {}
@@ -426,10 +430,10 @@ def test_add_member_already_exists(
 
 
 def test_add_member_nonexistent_user(client: TestClient, user_auth_headers, workspace):
-    with pytest.raises(IntegrityError):
-        client.patch(
-            f"{wsprefix}/{workspace['id']}/members/999999", headers=user_auth_headers
-        )
+    response = client.patch(
+        f"{wsprefix}/{workspace['id']}/members/999999", headers=user_auth_headers
+    )
+    assert response.status_code == 404
 
 
 @pytest.mark.parametrize(
@@ -441,6 +445,7 @@ def test_add_member_nonexistent_user(client: TestClient, user_auth_headers, work
 )
 def test_add_member_auth_failures(
     client: TestClient,
+    db_session,
     user_token,
     user_auth_headers,
     workspace,
@@ -454,6 +459,7 @@ def test_add_member_auth_failures(
             client, username="regular", email="regular@example.com"
         )
         add_workspace_member(client, user_token, workspace["id"], regular_user["id"])
+        verify_user_in_db(db_session, "regular@example.com")
         regular_token = login_user(client, email="regular@example.com")
         headers = auth_header(regular_token)
     target = create_test_user(client, username="target", email="target@example.com")
@@ -509,6 +515,7 @@ def test_make_admin_already_admin_is_noop(
 )
 def test_make_admin_auth_failures(
     client: TestClient,
+    db_session,
     user_token,
     user_auth_headers,
     workspace,
@@ -523,6 +530,7 @@ def test_make_admin_auth_failures(
             client, username="regular", email="regular@example.com"
         )
         add_workspace_member(client, user_token, workspace["id"], regular_user["id"])
+        verify_user_in_db(db_session, "regular@example.com")
         regular_token = login_user(client, email="regular@example.com")
         headers = auth_header(regular_token)
     kwargs = {"headers": headers} if headers else {}
@@ -620,7 +628,7 @@ def test_leave_workspace_last_member_deletes_workspace(
     assert response.status_code == 204
 
     # Verify workspace is gone
-    get_response = client.get(f"{wsprefix}/{workspace['id']}")
+    get_response = client.get(f"{wsprefix}/{workspace['id']}", headers=user_auth_headers)
     assert get_response.status_code == 404
 
 
@@ -632,11 +640,12 @@ def test_leave_workspace_last_member_deletes_workspace(
     ],
 )
 def test_leave_workspace_auth_failures(
-    client: TestClient, workspace, token, expected_status
+    client: TestClient, db_session, workspace, token, expected_status
 ):
     headers = None
     if token == "outsider":
         create_test_user(client, username="outsider", email="outsider@example.com")
+        verify_user_in_db(db_session, "outsider@example.com")
         token = login_user(client, email="outsider@example.com")
         headers = auth_header(token)
     kwargs = {"headers": headers} if headers else {}
@@ -681,6 +690,7 @@ def test_remove_member_not_a_member(client: TestClient, user_auth_headers, works
 )
 def test_remove_member_auth_failures(
     client: TestClient,
+    db_session,
     user_token,
     user_auth_headers,
     workspace,
@@ -695,6 +705,7 @@ def test_remove_member_auth_failures(
             client, username="regular", email="regular@example.com"
         )
         add_workspace_member(client, user_token, workspace["id"], regular_user["id"])
+        verify_user_in_db(db_session, "regular@example.com")
         regular_token = login_user(client, email="regular@example.com")
         headers = auth_header(regular_token)
     kwargs = {"headers": headers} if headers else {}

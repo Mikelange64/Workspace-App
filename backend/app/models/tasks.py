@@ -44,6 +44,7 @@ class Task(Base):
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
     due_date     : Mapped[datetime|None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at : Mapped[datetime|None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
 
     creator: Mapped["User"] = relationship(
         "User", foreign_keys=[creator_id], back_populates="created_tasks"

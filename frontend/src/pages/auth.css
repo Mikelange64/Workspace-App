@@ -1,11 +1,87 @@
+/* ── ORIGINAL centered-card layout (commented out for sidebar trial) ──
 .auth-page {
   min-height: 100vh;
-  background: var(--color-bg-canvas);
+  background-image: url('../assets/backdrop/login_backdrop.png');
+  background-size: cover;
+  background-position: center;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 24px;
+}
+── END ORIGINAL ── */
+
+/* ── TRIAL: full-bleed backdrop + right sidebar panel ── */
+.auth-page {
+  min-height: 100vh;
+  background-image: url('../assets/backdrop/login_backdrop.png');
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.auth-page__panel {
+  width: 33.333%;
+  min-width: 360px;
+  min-height: 100vh;
+  background: color-mix(in srgb, var(--color-bg-canvas) 45%, transparent);
+  backdrop-filter: blur(10px) saturate(150%);
+  -webkit-backdrop-filter: blur(15px) saturate(150%);
+  border-left: 1px solid rgba(255, 255, 255, 0.10);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 40px;
+  overflow-y: auto;
+}
+
+/* Dark / midnight: panel is dark-tinted so text and inputs need to be light */
+:root[data-theme='dark'] .auth-page__panel .auth-card__heading,
+:root[data-theme='dark'] .auth-page__panel .auth-card__subtext,
+:root[data-theme='dark'] .auth-page__panel .auth-card__footer,
+:root[data-theme='dark'] .auth-page__panel .auth-form__label,
+:root[data-theme='midnight'] .auth-page__panel .auth-card__heading,
+:root[data-theme='midnight'] .auth-page__panel .auth-card__subtext,
+:root[data-theme='midnight'] .auth-page__panel .auth-card__footer,
+:root[data-theme='midnight'] .auth-page__panel .auth-form__label {
+  color: hsl(0 0% 96%);
+}
+
+:root[data-theme='dark'] .auth-page__panel .auth-form__input,
+:root[data-theme='midnight'] .auth-page__panel .auth-form__input {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: hsl(0 0% 96%);
+}
+
+:root[data-theme='dark'] .auth-page__panel .auth-form__input::placeholder,
+:root[data-theme='midnight'] .auth-page__panel .auth-form__input::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+:root[data-theme='dark'] .auth-page__panel .auth-form__input:focus,
+:root[data-theme='midnight'] .auth-page__panel .auth-form__input:focus {
+  border-color: var(--color-brand-primary);
+  background: rgba(255, 255, 255, 0.18);
+}
+
+:root[data-theme='dark'] .auth-page__panel .auth-form__show-toggle,
+:root[data-theme='midnight'] .auth-page__panel .auth-form__show-toggle {
+  color: rgba(255, 255, 255, 0.60);
+}
+
+:root[data-theme='dark'] .auth-page__panel .auth-form__show-toggle:hover,
+:root[data-theme='midnight'] .auth-page__panel .auth-form__show-toggle:hover {
+  color: hsl(0 0% 96%);
+}
+
+.auth-card-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
 }
 
 .auth-card {
@@ -16,26 +92,19 @@
   border-radius: 12px;
   box-shadow: var(--shadow-overlay);
   padding: 40px 36px 36px;
+  position: relative;
+  z-index: 1;
 }
 
-/* Mascot placeholder — swap src for real SVG when ready */
-.auth-card__mascot {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 24px;
-}
-
-.auth-card__mascot-placeholder {
-  width: 96px;
-  height: 96px;
-  border-radius: 50%;
-  background: var(--color-neutral-bg);
-  border: 2px dashed var(--color-border-strong);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text-muted);
-  font-size: 2rem;
+.auth-card__mascot-img {
+  position: absolute;
+  left: calc(100% - 30px);
+  top: 50%;
+  transform: translateY(-50%);
+  height: 260px;
+  width: auto;
+  z-index: 0;
+  pointer-events: none;
 }
 
 .auth-card__heading {

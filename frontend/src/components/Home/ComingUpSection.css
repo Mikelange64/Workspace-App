@@ -91,10 +91,3 @@
   background-color: var(--color-neutral-bg);
   color: var(--color-neutral-text);
 }
-
-.coming-up__empty {
-  margin: 0;
-  font-size: 0.875rem;
-  color: var(--color-text-muted);
-  padding: 8px 10px;
-}

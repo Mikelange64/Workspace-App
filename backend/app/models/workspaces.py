@@ -1,5 +1,4 @@
 from datetime import UTC, datetime, timedelta
-
 from sqlalchemy import (
     Boolean,
     DateTime,
@@ -38,8 +37,10 @@ class Workspace(Base):
     due_date: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, default=None
     )
-    is_pinned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    is_archived: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_pinned     : Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_archived   : Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_completed  : Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    completed_at  : Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
 
     @property
     def default_due_date(self) -> datetime | None:

@@ -22,15 +22,25 @@ def send_email(
     if html_content:
         message.add_alternative(html_content, subtype="html")  # or clients that do render html
 
-    with smtplib.SMTP(settings.mail_host, settings.mail_port) as smtp:
-        if settings.mail_use_tls:
-            smtp.starttls()
-        if settings.mail_username and settings.mail_password:
-            smtp.login(
-                settings.mail_username,
-                settings.mail_password.get_secret_value()
-            )
-        smtp.send_message(message)
+    # Port 465 = implicit SSL (SMTP_SSL); port 587 = STARTTLS upgrade (SMTP + starttls())
+    if settings.mail_port == 465:
+        with smtplib.SMTP_SSL(settings.mail_host, settings.mail_port) as smtp:
+            if settings.mail_username and settings.mail_password:
+                smtp.login(
+                    settings.mail_username,
+                    settings.mail_password.get_secret_value(),
+                )
+            smtp.send_message(message)
+    else:
+        with smtplib.SMTP(settings.mail_host, settings.mail_port) as smtp:
+            if settings.mail_use_tls:
+                smtp.starttls()
+            if settings.mail_username and settings.mail_password:
+                smtp.login(
+                    settings.mail_username,
+                    settings.mail_password.get_secret_value(),
+                )
+            smtp.send_message(message)
 
     
 def send_password_reset_email(to_email: str, username: str, token: str) -> None:
@@ -49,12 +59,78 @@ def send_password_reset_email(to_email: str, username: str, token: str) -> None:
     If you didn't request this, you can safely ignore this email.
     
     Best Regards,
-    The Fast API Blog Team
+    The Filobelo Team
     """
 
     send_email(
         to_email=to_email,
         subject="Reset Your Password - Filobelo",
+        plain_text=plain_text,
+        html_content=html_content,
+    )
+
+
+def send_member_added_email(
+    to_email: str,
+    invitee_username: str,
+    inviter_username: str,
+    workspace_title: str,
+    workspace_url: str,
+) -> None:
+    template = templates.env.get_template("email/workspace_added.html")
+    html_content = template.render(
+        invitee_username=invitee_username,
+        inviter_username=inviter_username,
+        workspace_title=workspace_title,
+        workspace_url=workspace_url,
+    )
+
+    plain_text = f"""Hi {invitee_username},
+
+{inviter_username} has added you to the workspace "{workspace_title}" on Filobelo.
+
+Open your workspace: {workspace_url}
+
+If you didn't expect this invitation, you can safely ignore this email.
+
+Best Regards,
+The Filobelo Team
+"""
+
+    send_email(
+        to_email=to_email,
+        subject=f"You've been added to {workspace_title} — Filobelo",
+        plain_text=plain_text,
+        html_content=html_content,
+    )
+
+
+def send_join_invite_email(
+    to_email: str,
+    inviter_username: str,
+    workspace_title: str,
+    register_url: str,
+) -> None:
+    template = templates.env.get_template("email/join_invite.html")
+    html_content = template.render(
+        inviter_username=inviter_username,
+        workspace_title=workspace_title,
+        register_url=register_url,
+    )
+
+    plain_text = f"""{inviter_username} has invited you to collaborate on "{workspace_title}" on Filobelo.
+
+Create your free account to get started: {register_url}
+
+If you didn't expect this invitation, you can safely ignore this email.
+
+Best Regards,
+The Filobelo Team
+"""
+
+    send_email(
+        to_email=to_email,
+        subject=f"{inviter_username} invited you to join Filobelo",
         plain_text=plain_text,
         html_content=html_content,
     )

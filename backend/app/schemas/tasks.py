@@ -32,6 +32,7 @@ class TaskResponse(BaseModel):
     workspace_id : int
     due_date     : datetime | None
     is_completed : bool
+    completed_at : datetime | None
     date_created : datetime
 
 
@@ -43,10 +44,6 @@ class PaginatedTaskResponse(BaseModel):
     has_more : bool
 
 
-class TaskMove(BaseModel):
-    workspace_id : int
-
-
 class TaskSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -55,3 +52,4 @@ class TaskSummary(BaseModel):
     due_date     : datetime | None
     is_completed : bool
     owner_id     : int
+    completed_at : datetime | None

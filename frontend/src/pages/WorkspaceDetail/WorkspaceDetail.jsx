@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, Link, useNavigate, useOutletContext } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import filobeloProud from '../../assets/mascott/filobelo_proud.svg'
 import {
   authFetch,
   getWorkspace,
@@ -9,8 +10,10 @@ import {
   deleteTask,
   toggleTask,
   patchWorkspace,
+  completeWorkspace,
   getMembersWithRoles,
   inviteMember,
+  inviteExternal,
   promoteToAdmin,
   removeMember,
   searchUser,
@@ -53,6 +56,7 @@ function normalizeWorkspace(ws) {
     description: ws.description,
     dueDate: ws.due_date ?? null,
     currentUserRole: ws.current_user_role ?? null,
+    isCompleted: ws.is_completed ?? false,
     members: (ws.members ?? []).map((m) => ({
       id: m.id,
       name: m.username,
@@ -157,14 +161,12 @@ function TaskRowMenu({ isCompleted, isOwner, isAdmin, onEdit, onToggle, onReassi
               Edit
             </button>
           </li>
-          {(isOwner || isAdmin) && (
-            <li role="none">
-              <button type="button" role="menuitem" className="wd-menu-item"
-                onClick={() => { onToggle(); setIsOpen(false) }}>
-                {isCompleted ? 'Mark incomplete' : 'Mark complete'}
-              </button>
-            </li>
-          )}
+          <li role="none">
+            <button type="button" role="menuitem" className="wd-menu-item"
+              onClick={() => { onToggle(); setIsOpen(false) }}>
+              {isCompleted ? 'Mark incomplete' : 'Mark complete'}
+            </button>
+          </li>
           {canReassign && (
             <li role="none">
               <button type="button" role="menuitem" className="wd-menu-item"
@@ -190,7 +192,7 @@ function TaskRowMenu({ isCompleted, isOwner, isAdmin, onEdit, onToggle, onReassi
 function TaskRow({ task, member, isAdmin, currentUserId, onSelect, onToggle, onReassign, onDelete }) {
   const urgency = getTaskUrgency(task.dueDate)
   const isOwner = task.ownerId === currentUserId
-  const canToggle = isOwner || isAdmin
+  const canToggle = true
   return (
     <div className={`task-row${task.isCompleted ? ' task-row--completed' : ''}`}>
       {canToggle ? (
@@ -287,21 +289,37 @@ function InvitePanel({ workspaceId, onMemberAdded }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [found, setFound] = useState(null)
+  const [notFound, setNotFound] = useState(false)
+  const [inviteSent, setInviteSent] = useState(false)
   const [error, setError] = useState('')
   const [searching, setSearching] = useState(false)
   const [adding, setAdding] = useState(false)
+
+  function resetState() {
+    setQuery('')
+    setFound(null)
+    setNotFound(false)
+    setInviteSent(false)
+    setError('')
+  }
 
   async function handleSearch() {
     const q = query.trim()
     if (!q) return
     setSearching(true)
     setFound(null)
+    setNotFound(false)
+    setInviteSent(false)
     setError('')
     try {
       const user = await searchUser(q)
       setFound(user)
     } catch (err) {
-      setError(err.status === 404 ? 'No user found with that username or email.' : 'Search failed.')
+      if (err.status === 404 && q.includes('@')) {
+        setNotFound(true)
+      } else {
+        setError(err.status === 404 ? 'No user found with that username or email.' : 'Search failed.')
+      }
     } finally {
       setSearching(false)
     }
@@ -313,11 +331,24 @@ function InvitePanel({ workspaceId, onMemberAdded }) {
     try {
       await inviteMember(workspaceId, found.id)
       onMemberAdded()
-      setQuery('')
-      setFound(null)
+      resetState()
       setOpen(false)
     } catch (err) {
       setError(err.status === 409 ? 'Already a member of this workspace.' : (err.detail ?? 'Could not add member.'))
+    } finally {
+      setAdding(false)
+    }
+  }
+
+  async function handleSendJoinInvite() {
+    const email = query.trim()
+    setAdding(true)
+    try {
+      await inviteExternal(workspaceId, email)
+      setInviteSent(true)
+      setNotFound(false)
+    } catch (err) {
+      setError(err.detail ?? 'Failed to send invitation.')
     } finally {
       setAdding(false)
     }
@@ -339,14 +370,14 @@ function InvitePanel({ workspaceId, onMemberAdded }) {
           className="invite-panel__input"
           placeholder="username or email@example.com"
           value={query}
-          onChange={(e) => { setQuery(e.target.value); setFound(null); setError('') }}
+          onChange={(e) => { setQuery(e.target.value); setFound(null); setNotFound(false); setError(''); setInviteSent(false) }}
           onKeyDown={(e) => { if (e.key === 'Enter') handleSearch() }}
           autoFocus
         />
         <button type="button" className="invite-panel__search-btn" onClick={handleSearch} disabled={searching}>
           {searching ? '…' : 'Search'}
         </button>
-        <button type="button" className="invite-panel__cancel" onClick={() => { setOpen(false); setQuery(''); setFound(null); setError('') }}>
+        <button type="button" className="invite-panel__cancel" onClick={() => { setOpen(false); resetState() }}>
           ✕
         </button>
       </div>
@@ -359,6 +390,21 @@ function InvitePanel({ workspaceId, onMemberAdded }) {
             {adding ? 'Adding…' : 'Add to workspace'}
           </button>
         </div>
+      )}
+
+      {notFound && !inviteSent && (
+        <div className="invite-panel__not-found">
+          <p className="invite-panel__not-found-msg">
+            No Filobelo account for <strong>{query.trim()}</strong>.
+          </p>
+          <button type="button" className="invite-panel__add-btn" onClick={handleSendJoinInvite} disabled={adding}>
+            {adding ? 'Sending…' : 'Send join invitation'}
+          </button>
+        </div>
+      )}
+
+      {inviteSent && (
+        <p className="invite-panel__success">Invitation sent to {query.trim()}</p>
       )}
 
       {error && <p className="invite-panel__error">{error}</p>}
@@ -428,13 +474,14 @@ function MemberListRow({ member, isAdmin, isSelf, onRemove, onPromote, onLeave, 
   )
 }
 
-function SettingsTab({ workspace, isAdmin, isCreator, workspaceId, onWorkspaceUpdate, onDelete, onLeave }) {
+function SettingsTab({ workspace, isAdmin, isCreator, workspaceId, onWorkspaceUpdate, onDelete, onLeave, onComplete, onReopen }) {
   const [title, setTitle] = useState(workspace.title)
   const [description, setDescription] = useState(workspace.description)
   const [dueDate, setDueDate] = useState(
     workspace.dueDate ? workspace.dueDate.split('T')[0] : ''
   )
   const [saving, setSaving] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   async function handleSave() {
     const trimTitle = title.trim()
@@ -446,7 +493,7 @@ function SettingsTab({ workspace, isAdmin, isCreator, workspaceId, onWorkspaceUp
       await patchWorkspace(workspaceId, patch)
       onWorkspaceUpdate({ title: trimTitle, description: trimDesc, dueDate: dueDate || null })
     } catch (err) {
-      alert(err.detail ?? 'Could not save changes')
+      onToast?.(err.detail ?? 'Could not save changes')
     } finally {
       setSaving(false)
     }
@@ -488,6 +535,35 @@ function SettingsTab({ workspace, isAdmin, isCreator, workspaceId, onWorkspaceUp
         )}
       </section>
 
+      {isAdmin && (
+        <section className="settings-section">
+          <h2 className="settings-section__title">Completion</h2>
+          <div className="settings-danger-row">
+            {workspace.isCompleted ? (
+              <>
+                <div>
+                  <p className="settings-danger-label">Workspace completed</p>
+                  <p className="settings-danger-desc">Reopen this workspace to keep working on it.</p>
+                </div>
+                <button type="button" className="settings-complete-btn settings-complete-btn--reopen" onClick={onReopen}>
+                  Reopen
+                </button>
+              </>
+            ) : (
+              <>
+                <div>
+                  <p className="settings-danger-label">Mark workspace complete</p>
+                  <p className="settings-danger-desc">Closes this workspace and moves it to your completed list.</p>
+                </div>
+                <button type="button" className="settings-complete-btn" onClick={onComplete}>
+                  Mark complete
+                </button>
+              </>
+            )}
+          </div>
+        </section>
+      )}
+
       <section className="settings-section settings-section--danger">
         <h2 className="settings-section__title">Danger zone</h2>
 
@@ -513,13 +589,32 @@ function SettingsTab({ workspace, isAdmin, isCreator, workspaceId, onWorkspaceUp
         )}
         {isCreator && (
           <div className="settings-danger-row">
-            <div>
-              <p className="settings-danger-label">Delete workspace</p>
-              <p className="settings-danger-desc">Permanently deletes the workspace and all tasks. Cannot be undone.</p>
-            </div>
-            <button type="button" className="settings-danger-btn settings-danger-btn--critical" onClick={onDelete}>
-              Delete
-            </button>
+            {confirmDelete ? (
+              <>
+                <div>
+                  <p className="settings-danger-label">Are you sure?</p>
+                  <p className="settings-danger-desc">This permanently deletes the workspace and all its tasks. There is no undo.</p>
+                </div>
+                <div className="settings-danger-confirm">
+                  <button type="button" className="settings-danger-btn settings-danger-btn--critical" onClick={onDelete}>
+                    Yes, delete
+                  </button>
+                  <button type="button" className="settings-danger-btn" onClick={() => setConfirmDelete(false)}>
+                    Cancel
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <p className="settings-danger-label">Delete workspace</p>
+                  <p className="settings-danger-desc">Permanently deletes the workspace and all tasks. Cannot be undone.</p>
+                </div>
+                <button type="button" className="settings-danger-btn settings-danger-btn--critical" onClick={() => setConfirmDelete(true)}>
+                  Delete
+                </button>
+              </>
+            )}
           </div>
         )}
       </section>
@@ -562,7 +657,7 @@ function SlideOver({ task, fullTask, slideOverLoading, workspace, memberById, me
 
   const owner = memberById.get(task.ownerId)
   const isOwner = task.ownerId === currentUserId
-  const canToggle = isOwner || isAdmin
+  const canToggle = true
   const canReassign = isOwner || isAdmin
 
   async function handleTitleBlur() {
@@ -740,7 +835,7 @@ function WorkspaceDetail() {
   const workspaceId = parseInt(id, 10)
   const { user } = useAuth()
   const navigate = useNavigate()
-  const { onDelete: shellDelete, onLeave: shellLeave, onComingSoon } = useOutletContext()
+  const { onDelete: shellDelete, onLeave: shellLeave, onComingSoon, onTaskToggled, onWorkspaceTasksChanged, onWorkspaceCompleted, onWorkspaceReopened, onToast } = useOutletContext()
   const currentUserId = user?.id
 
   const [workspace, setWorkspace]               = useState(null)
@@ -758,6 +853,11 @@ function WorkspaceDetail() {
   const [detailMembers, setDetailMembers]       = useState(null)
   const [membersLoading, setMembersLoading]     = useState(false)
   const [reassignTaskId, setReassignTaskId]     = useState(null)
+  const [showCompletionModal, setShowCompletionModal] = useState(false)
+  const [showConfirmComplete, setShowConfirmComplete] = useState(false)
+  const [completingWorkspace, setCompletingWorkspace] = useState(false)
+  const [showReopenModal, setShowReopenModal] = useState(false)
+  const [pendingAddTitle, setPendingAddTitle] = useState('')
 
   useEffect(() => {
     async function load() {
@@ -827,45 +927,90 @@ function WorkspaceDetail() {
     if (!task) return
     const next = !task.isCompleted
     setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, isCompleted: next } : t))
+    onTaskToggled?.(workspaceId, taskId, next)
+    if (next && tasks.length > 0 && tasks.filter((t) => t.id !== taskId && !t.isCompleted).length === 0) {
+      setShowCompletionModal(true)
+    }
     try {
       await toggleTask(workspaceId, taskId)
     } catch {
       setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, isCompleted: task.isCompleted } : t))
+      onTaskToggled?.(workspaceId, taskId, task.isCompleted)
     }
   }
 
   async function handleAddTask() {
     const title = inlineAddTitle.trim()
     if (!title) return
+    if (workspace.isCompleted) {
+      setPendingAddTitle(title)
+      setShowReopenModal(true)
+      return
+    }
+    await doAddTask(title)
+  }
+
+  async function doAddTask(title) {
     setInlineAddTitle('')
     setShowInlineAdd(false)
     try {
       const data = await createTask(workspaceId, { title })
-      setTasks((prev) => [normalizeTask(data), ...prev])
+      const newTasks = [normalizeTask(data), ...tasks]
+      setTasks(newTasks)
+      onWorkspaceTasksChanged?.(workspaceId, newTasks)
     } catch (err) {
-      alert(err.detail ?? 'Could not create task')
+      onToast?.(err.detail ?? 'Could not create task')
+    }
+  }
+
+  async function handleReopenAndAdd() {
+    setShowReopenModal(false)
+    try {
+      await onWorkspaceReopened?.(workspaceId)
+      setWorkspace((prev) => ({ ...prev, isCompleted: false }))
+      await doAddTask(pendingAddTitle)
+    } catch (err) {
+      onToast?.(err.message ?? 'Could not reopen workspace')
+    } finally {
+      setPendingAddTitle('')
+    }
+  }
+
+  async function handleReopenWorkspace() {
+    try {
+      await onWorkspaceReopened?.(workspaceId)
+      setWorkspace((prev) => ({ ...prev, isCompleted: false }))
+    } catch (err) {
+      onToast?.(err.message ?? 'Could not reopen workspace')
     }
   }
 
   async function handleDeleteTask(taskId) {
-    setTasks((prev) => prev.filter((t) => t.id !== taskId))
+    const prevTasks = tasks
+    const newTasks = tasks.filter((t) => t.id !== taskId)
+    setTasks(newTasks)
+    onWorkspaceTasksChanged?.(workspaceId, newTasks)
     if (selectedTaskId === taskId) handleCloseSlideOver()
     try {
       await deleteTask(workspaceId, taskId)
     } catch (err) {
-      alert(err.detail ?? 'Could not delete task')
+      onToast?.(err.detail ?? 'Could not delete task')
+      setTasks(prevTasks)
+      onWorkspaceTasksChanged?.(workspaceId, prevTasks)
     }
   }
 
   async function handleSaveTask(taskId, patch) {
     try {
       await patchTask(workspaceId, taskId, patch)
-      setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, ...patch } : t))
+      const newTasks = tasks.map((t) => t.id === taskId ? { ...t, ...patch } : t)
+      setTasks(newTasks)
+      onWorkspaceTasksChanged?.(workspaceId, newTasks)
       if (patch.content !== undefined) {
         setSlideOverTask((prev) => prev ? { ...prev, content: patch.content } : prev)
       }
     } catch (err) {
-      console.error(err)
+      onToast?.(err.detail ?? 'Could not save task')
     }
   }
 
@@ -875,7 +1020,7 @@ function WorkspaceDetail() {
       await reassignTask(workspaceId, taskId, userId)
       setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, ownerId: userId } : t))
     } catch (err) {
-      alert(err.detail ?? 'Could not reassign task')
+      onToast?.(err.detail ?? 'Could not reassign task')
     }
   }
 
@@ -886,7 +1031,7 @@ function WorkspaceDetail() {
       await removeMember(workspaceId, userId)
     } catch (err) {
       setDetailMembers(prev)
-      alert(err.detail ?? 'Could not remove member')
+      onToast?.(err.detail ?? 'Could not remove member')
     }
   }
 
@@ -895,7 +1040,7 @@ function WorkspaceDetail() {
       await promoteToAdmin(workspaceId, userId)
       setDetailMembers((prev) => prev?.map((m) => m.id === userId ? { ...m, role: 'admin' } : m) ?? null)
     } catch (err) {
-      alert(err.detail ?? 'Could not promote member')
+      onToast?.(err.detail ?? 'Could not promote member')
     }
   }
 
@@ -913,6 +1058,27 @@ function WorkspaceDetail() {
   async function handleDeleteWorkspace() {
     await shellDelete(workspaceId)
     navigate('/')
+  }
+
+  async function handleMarkWorkspaceComplete() {
+    setCompletingWorkspace(true)
+    try {
+      await onWorkspaceCompleted(workspaceId)
+      navigate('/')
+    } catch (err) {
+      onToast?.(err.message ?? 'Could not complete workspace')
+    } finally {
+      setCompletingWorkspace(false)
+    }
+  }
+
+  function handleRequestComplete() {
+    const openCount = tasks.filter((t) => !t.isCompleted).length
+    if (openCount > 0) {
+      setShowConfirmComplete(true)
+    } else {
+      handleMarkWorkspaceComplete()
+    }
   }
 
   async function handleLeaveWorkspace() {
@@ -992,6 +1158,20 @@ function WorkspaceDetail() {
                 </span>
               )}
             </div>
+            {isAdmin && (
+              workspace.isCompleted ? (
+                <span className="wd-header__completed-badge">✓ Completed</span>
+              ) : (
+                <button
+                  type="button"
+                  className="settings-complete-btn"
+                  onClick={handleRequestComplete}
+                  disabled={completingWorkspace}
+                >
+                  Mark complete
+                </button>
+              )
+            )}
           </div>
         </div>
 
@@ -1155,6 +1335,8 @@ function WorkspaceDetail() {
             onWorkspaceUpdate={handleWorkspaceUpdate}
             onDelete={handleDeleteWorkspace}
             onLeave={handleLeaveWorkspace}
+            onComplete={handleRequestComplete}
+            onReopen={handleReopenWorkspace}
           />
         )}
       </div>
@@ -1194,6 +1376,87 @@ function WorkspaceDetail() {
 
       {/* ── Floating actions ── */}
       <FloatingActions onComingSoon={onComingSoon} />
+
+      {/* ── Workspace completion modal ── */}
+      {showCompletionModal && (
+        <div className="completion-overlay" onClick={() => setShowCompletionModal(false)}>
+          <div className="completion-modal" role="dialog" aria-label="All tasks done" onClick={(e) => e.stopPropagation()}>
+            <img src={filobeloProud} alt="" className="completion-modal__img" />
+            <h2 className="completion-modal__heading">All tasks done!</h2>
+            <p className="completion-modal__sub">Ready to close this workspace?</p>
+            <div className="completion-modal__actions">
+              <button
+                type="button"
+                className="completion-modal__btn completion-modal__btn--primary"
+                onClick={() => { setShowCompletionModal(false); handleMarkWorkspaceComplete() }}
+                disabled={completingWorkspace}
+              >
+                Mark complete
+              </button>
+              <button
+                type="button"
+                className="completion-modal__btn completion-modal__btn--ghost"
+                onClick={() => setShowCompletionModal(false)}
+              >
+                Keep working
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showConfirmComplete && (
+        <div className="completion-overlay" onClick={() => setShowConfirmComplete(false)}>
+          <div className="completion-modal" role="dialog" aria-label="Confirm completion" onClick={(e) => e.stopPropagation()}>
+            <h2 className="completion-modal__heading" style={{ fontSize: '1.25rem' }}>
+              {tasks.filter((t) => !t.isCompleted).length} task{tasks.filter((t) => !t.isCompleted).length !== 1 ? 's' : ''} still open
+            </h2>
+            <p className="completion-modal__sub">Mark this workspace complete anyway?</p>
+            <div className="completion-modal__actions">
+              <button
+                type="button"
+                className="completion-modal__btn completion-modal__btn--primary"
+                onClick={() => { setShowConfirmComplete(false); handleMarkWorkspaceComplete() }}
+                disabled={completingWorkspace}
+              >
+                Complete anyway
+              </button>
+              <button
+                type="button"
+                className="completion-modal__btn completion-modal__btn--ghost"
+                onClick={() => setShowConfirmComplete(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showReopenModal && (
+        <div className="completion-overlay" onClick={() => { setShowReopenModal(false); setPendingAddTitle('') }}>
+          <div className="completion-modal" role="dialog" aria-label="Reopen workspace" onClick={(e) => e.stopPropagation()}>
+            <h2 className="completion-modal__heading" style={{ fontSize: '1.25rem' }}>This workspace is completed</h2>
+            <p className="completion-modal__sub">Would you like to reopen it and keep working?</p>
+            <div className="completion-modal__actions">
+              <button
+                type="button"
+                className="completion-modal__btn completion-modal__btn--primary"
+                onClick={handleReopenAndAdd}
+              >
+                Reopen &amp; keep working
+              </button>
+              <button
+                type="button"
+                className="completion-modal__btn completion-modal__btn--ghost"
+                onClick={() => { setShowReopenModal(false); setPendingAddTitle('') }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

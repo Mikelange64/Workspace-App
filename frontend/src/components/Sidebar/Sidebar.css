@@ -72,6 +72,45 @@
   color: var(--color-text-muted);
 }
 
+.sidebar__section-count {
+  font-weight: 500;
+  opacity: 0.7;
+}
+
+.sidebar__completed-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6px 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background-color 0.1s;
+}
+
+.sidebar__completed-btn:hover {
+  background: var(--color-bg-canvas-hover);
+}
+
+.sidebar__completed-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.sidebar__completed-count {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  background: var(--color-neutral-bg);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+
 .sidebar__section-add {
   display: flex;
   align-items: center;

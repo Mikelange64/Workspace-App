@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 
-const STORAGE_KEY = 'workspaceapp-theme'
+const STORAGE_KEY = 'filobelo-theme'
 const VALID_THEMES = ['light', 'dark', 'midnight']
 const ThemeContext = createContext(null)
 

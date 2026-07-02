@@ -28,3 +28,8 @@
 .empty-state__cta:hover {
   background-color: var(--color-brand-primary-hover);
 }
+
+.empty-state__mascot-img {
+  width: 200px;
+  height: auto;
+}

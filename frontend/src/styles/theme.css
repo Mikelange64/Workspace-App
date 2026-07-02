@@ -96,9 +96,9 @@
     --color-text-muted: hsl(0 0% 45%);
     --color-text-on-brand: hsl(184 80% 10%);
 
-    --color-border: hsl(0 0% 28%);
-    --color-border-strong: hsl(0 0% 40%);
-    --color-card-top-border: hsl(0 0% 30%);
+    --color-border: hsl(0 0% 42%);
+    --color-border-strong: hsl(0 0% 55%);
+    --color-card-top-border: hsl(0 0% 44%);
 
     --color-error: hsl(8 75% 62%);
     --color-error-bg: hsl(8 45% 16%);
@@ -199,9 +199,9 @@
   --color-text-muted: hsl(0 0% 45%);
   --color-text-on-brand: hsl(184 80% 10%);
 
-  --color-border: hsl(0 0% 28%);
-  --color-border-strong: hsl(0 0% 40%);
-  --color-card-top-border: hsl(0 0% 30%);
+  --color-border: hsl(0 0% 42%);
+  --color-border-strong: hsl(0 0% 55%);
+  --color-card-top-border: hsl(0 0% 44%);
 
   --color-error: hsl(8 75% 62%);
   --color-error-bg: hsl(8 45% 16%);
@@ -250,9 +250,9 @@
   --color-text-muted: hsl(220 10% 46%);
   --color-text-on-brand: hsl(184 80% 10%);
 
-  --color-border: hsl(222 18% 26%);
-  --color-border-strong: hsl(222 16% 38%);
-  --color-card-top-border: hsl(222 18% 28%);
+  --color-border: hsl(222 16% 42%);
+  --color-border-strong: hsl(222 14% 56%);
+  --color-card-top-border: hsl(222 16% 44%);
 
   --color-error: hsl(8 75% 62%);
   --color-error-bg: hsl(8 40% 14%);

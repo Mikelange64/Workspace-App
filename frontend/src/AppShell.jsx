@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
-import { Outlet, useNavigate } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import Topbar from './components/Topbar/Topbar'
 import Sidebar from './components/Sidebar/Sidebar'
 import NewWorkspaceModal from './components/Home/NewWorkspaceModal'
 import ProfileModal from './components/Profile/ProfileModal'
 import CalendarModal from './components/Calendar/CalendarModal'
+import CompletedWorkspacesModal from './components/Home/CompletedWorkspacesModal'
 import Toast from './components/shared/Toast'
 import { useAuth } from './context/AuthContext'
 import {
@@ -17,6 +18,9 @@ import {
   createFolder,
   updateFolder,
   deleteFolder,
+  getCompletedWorkspaces,
+  completeWorkspace,
+  reopenWorkspace,
 } from './api/client'
 import './App.css'
 
@@ -44,6 +48,7 @@ function normalizeWorkspace(ws) {
       name: m.username,
       avatarUrl: toAvatarUrl(m.image_path),
     })),
+    isCompleted: ws.is_completed ?? false,
     tasks: ws.tasks?.map((t) => ({
       id: t.id,
       title: t.title,
@@ -56,6 +61,7 @@ function normalizeWorkspace(ws) {
 function AppShell() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [workspaces, setWorkspaces] = useState([])
   const [folders, setFolders] = useState([])
   const [searchValue, setSearchValue] = useState('')
@@ -64,33 +70,53 @@ function AppShell() {
   const [showCalendar, setShowCalendar] = useState(false)
   const [calendarPrefillDate, setCalendarPrefillDate] = useState(null)
   const [toast, setToast] = useState(null)
+  const [showCompletedModal, setShowCompletedModal] = useState(false)
+  const [completedTotal, setCompletedTotal] = useState(0)
 
   function showComingSoon() {
     setToast('Currently unavailable — coming soon')
   }
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const [wsData, folderData] = await Promise.all([
-          authFetch('/workspaces'),
-          getFolders(),
-        ])
-        setWorkspaces(wsData.workspaces.map(normalizeWorkspace))
-        setFolders(folderData)
-      } catch (err) {
-        console.error(err)
-      }
+  async function loadData() {
+    try {
+      const [wsData, folderData, completedData] = await Promise.all([
+        authFetch('/workspaces'),
+        getFolders(),
+        getCompletedWorkspaces(0, 1),
+      ])
+      setWorkspaces(wsData.workspaces.map(normalizeWorkspace))
+      setFolders(folderData)
+      setCompletedTotal(completedData.total)
+    } catch {
+      setToast('Failed to load workspaces — please refresh')
     }
+  }
+
+  // Initial load
+  useEffect(() => {
     loadData()
   }, [])
+
+  // Re-fetch whenever the user navigates back to home
+  const isFirstRender = useRef(true)
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      return
+    }
+    if (location.pathname === '/') {
+      loadData()
+    }
+  }, [location.pathname])
 
   const currentUser = {
     name: user?.username,
     avatarUrl: toAvatarUrl(user?.image_path),
   }
 
-  const activeWorkspaces = workspaces.filter((ws) => !ws.isArchived)
+  const activeWorkspaces = workspaces.filter(
+    (ws) => !ws.isArchived && !ws.isCompleted
+  )
 
   const searchSuggestions = searchValue.trim()
     ? activeWorkspaces.filter((ws) =>
@@ -201,6 +227,41 @@ function AppShell() {
     }
   }
 
+  async function handleWorkspaceCompleted(wsId) {
+    await completeWorkspace(wsId)
+    setWorkspaces((prev) => prev.filter((ws) => ws.id !== wsId))
+    setCompletedTotal((c) => c + 1)
+  }
+
+  async function handleWorkspaceReopened(wsId) {
+    await reopenWorkspace(wsId)
+    setWorkspaces((prev) => prev.map((ws) => ws.id === wsId ? { ...ws, isCompleted: false } : ws))
+    setCompletedTotal((c) => Math.max(0, c - 1))
+  }
+
+  function handleTaskToggled(wsId, taskId, isCompleted) {
+    setWorkspaces((prev) =>
+      prev.map((ws) => {
+        if (ws.id !== wsId) return ws
+        const tasks = ws.tasks.map((t) => (t.id === taskId ? { ...t, isCompleted } : t))
+        const done = tasks.filter((t) => t.isCompleted).length
+        const progress = tasks.length > 0 ? Math.round((done / tasks.length) * 100) : 0
+        return { ...ws, tasks, progress }
+      })
+    )
+  }
+
+  function handleWorkspaceTasksChanged(wsId, tasks) {
+    setWorkspaces((prev) =>
+      prev.map((ws) => {
+        if (ws.id !== wsId) return ws
+        const done = tasks.filter((t) => t.isCompleted).length
+        const progress = tasks.length > 0 ? Math.round((done / tasks.length) * 100) : 0
+        return { ...ws, tasks, progress }
+      })
+    )
+  }
+
   async function handleCreateWorkspace(data) {
     const ws = await createWorkspace(data)
     setWorkspaces((prev) => [normalizeWorkspace(ws), ...prev])
@@ -219,16 +280,23 @@ function AppShell() {
     onDelete: handleDelete,
     onLeave: handleLeave,
     onComingSoon: showComingSoon,
+    onTaskToggled: handleTaskToggled,
+    onWorkspaceTasksChanged: handleWorkspaceTasksChanged,
+    onWorkspaceCompleted: handleWorkspaceCompleted,
+    onWorkspaceReopened: handleWorkspaceReopened,
+    onToast: setToast,
   }
 
   return (
     <div className="app-shell">
       <Sidebar
         workspaces={activeWorkspaces}
+        completedCount={completedTotal}
         folders={folders}
         currentUser={currentUser}
         onNewWorkspace={() => setShowNewModal(true)}
         onOpenInbox={showComingSoon}
+        onOpenCompleted={() => setShowCompletedModal(true)}
         onSelectWorkspace={handleSelectWorkspace}
         onTogglePin={handleTogglePin}
         onArchive={handleArchive}
@@ -243,7 +311,11 @@ function AppShell() {
 
       <div className="app-shell__main">
         <Topbar
-          onLogoClick={() => navigate('/')}
+          logoSlot={
+            <button type="button" className="topbar__logo-btn" onClick={() => navigate('/')} aria-label="Go to home">
+              <span className="topbar__logo-text">Filobelo</span>
+            </button>
+          }
           searchValue={searchValue}
           onSearchChange={setSearchValue}
           onSearchSubmit={() => {}}
@@ -258,7 +330,9 @@ function AppShell() {
             else if (action === 'account') setShowProfileModal(true)
           }}
         />
-        <Outlet context={outletCtx} />
+        <div className="app-shell__content">
+          <Outlet context={outletCtx} />
+        </div>
       </div>
 
       {showNewModal && (
@@ -282,7 +356,14 @@ function AppShell() {
       )}
 
       {showProfileModal && (
-        <ProfileModal onClose={() => setShowProfileModal(false)} />
+        <ProfileModal onClose={() => setShowProfileModal(false)} onToast={setToast} />
+      )}
+
+      {showCompletedModal && (
+        <CompletedWorkspacesModal
+          onClose={() => setShowCompletedModal(false)}
+          onSelectWorkspace={(id) => { setShowCompletedModal(false); handleSelectWorkspace(id) }}
+        />
       )}
 
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}

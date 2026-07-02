@@ -88,8 +88,8 @@ function Register() {
   if (success) {
     return (
       <div className="auth-page">
-        <div className="auth-card">
-          <h1 className="auth-card__heading">Check your email</h1>
+        <div className="auth-page__panel">
+            <h1 className="auth-card__heading">Check your email</h1>
           <p className="auth-card__subtext">
             We sent a verification link to <strong>{email}</strong>.
             Click it to activate your account, then sign in.
@@ -104,14 +104,9 @@ function Register() {
 
   return (
     <div className="auth-page">
-      <div className="auth-card">
-        <div className="auth-card__mascot">
-          {/* Swap this div for <img src={fileoBelloBackpack} alt="Filobelo with backpack" /> when SVG is ready */}
-          <div className="auth-card__mascot-placeholder" aria-hidden="true">🎒</div>
-        </div>
-
+      <div className="auth-page__panel">
         <h1 className="auth-card__heading">Create your account</h1>
-        <p className="auth-card__subtext">Get started with WorkspaceApp</p>
+        <p className="auth-card__subtext">Get started with Filobelo</p>
 
         <form className="auth-form" onSubmit={handleSubmit} noValidate>
           {/* Avatar picker */}
@@ -243,6 +238,7 @@ function Register() {
           Already have an account?{' '}
           <Link to="/login">Sign in</Link>
         </p>
+      {/* </div> */}
       </div>
     </div>
   )
