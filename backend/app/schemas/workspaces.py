@@ -4,10 +4,6 @@ from .users import UserPublic
 from .tasks import TaskSummary
 
 
-class Base(BaseModel):
-    pass
-
-
 class WorkspaceBase(BaseModel):
     title       : str = Field(min_length=1, max_length=50)
     description : str | None = Field(min_length=1, max_length=500, default=None)
@@ -23,7 +19,7 @@ class WorkspaceResponse(WorkspaceBase):
     model_config = ConfigDict(from_attributes=True)
 
     id                : int
-    creator_id        : int
+    creator_id        : int | None
     folder_id         : int | None
     title             : str
     description       : str | None
@@ -43,7 +39,7 @@ class WorkspaceResponse(WorkspaceBase):
     completed_at      : datetime | None = None
 
 
-class PaginatedWorkspaceResponse(Base):
+class PaginatedWorkspaceResponse(BaseModel):
     workspaces : list[WorkspaceResponse]
     total      : int
     skip       : int
@@ -51,7 +47,7 @@ class PaginatedWorkspaceResponse(Base):
     has_more   : bool
 
 
-class InviteExternalRequest(Base):
+class InviteExternalRequest(BaseModel):
     email: EmailStr
 
 

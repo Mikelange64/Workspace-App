@@ -45,7 +45,9 @@ def create_task(
     return new_task
 
 
-@router.get("/", response_model=PaginatedTaskResponse, dependencies=[Depends(require_membership)])
+@router.get(
+    "/", response_model=PaginatedTaskResponse, dependencies=[Depends(require_membership)]
+)
 def list_tasks(
     workspace_id: int,
     db: DbSession,
@@ -66,15 +68,9 @@ def list_tasks(
 
 
 @router.get(
-    "/{task_id}",
-    response_model=TaskResponse,
-    dependencies=[Depends(require_membership)],
+    "/{task_id}", response_model=TaskResponse, dependencies=[Depends(require_membership)]
 )
-def get_task(
-    task_id: int,
-    workspace_id: int,
-    db: DbSession,
-):
+def get_task(task_id: int, db: DbSession):
     task = get_task_by_id(task_id, db)
     return task
 

@@ -27,8 +27,8 @@ class TaskResponse(BaseModel):
     id           : int
     title        : str
     content      : str
-    creator_id   : int
-    owner_id     : int
+    creator_id   : int | None
+    owner_id     : int | None
     workspace_id : int
     due_date     : datetime | None
     is_completed : bool
@@ -51,5 +51,5 @@ class TaskSummary(BaseModel):
     title        : str
     due_date     : datetime | None
     is_completed : bool
-    owner_id     : int
+    owner_id     : int | None
     completed_at : datetime | None

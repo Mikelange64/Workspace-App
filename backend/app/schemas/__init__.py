@@ -1,14 +1,39 @@
 from .auth import (
-    EmailVerification,
     ChangePasswordRequest,
+    EmailVerification,
     ForgotPasswordRequest,
     RefreshRequest,
     ResendVerificationRequest,
     ResetPasswordRequest,
     Token,
 )
+from .conversations import (
+    ConversationCreate,
+    ConversationResponse,
+    ConversationUpdate,
+    MessageCreate,
+    MessageResponse,
+    PaginatedMessageResponse,
+)
 from .folders import FolderCreate, FolderResponse, FolderUpdate
-from .tasks import PaginatedTaskResponse, TaskCreate, TaskFullUpdate, TaskResponse, TaskSummary, TaskUpdate
+from .resources import (
+    LinkCreate,
+    LinkResponse,
+    LinkUpdate,
+    NoteCreate,
+    NoteResponse,
+    NoteUpdate,
+    FileResponse,
+    ResourceSummary,
+)
+from .tasks import (
+    PaginatedTaskResponse,
+    TaskCreate,
+    TaskFullUpdate,
+    TaskResponse,
+    TaskSummary,
+    TaskUpdate,
+)
 from .users import (
     PaginatedSuperUserResponse,
     SuperUserResponse,
@@ -27,26 +52,6 @@ from .workspaces import (
 )
 
 __all__ = [
-    # TASK
-    "TaskCreate",
-    "TaskFullUpdate",
-    "TaskResponse",
-    "TaskSummary",
-    "PaginatedTaskResponse",
-    "TaskUpdate",
-
-    # FOLDER
-    "FolderCreate",
-    "FolderResponse",
-    "FolderUpdate",
-
-    # WORKSPACE
-    "InviteExternalRequest",
-    "WorkspaceCreate",
-    "WorkspaceResponse",
-    "WorkspaceUpdate",
-    "PaginatedWorkspaceResponse",
-
     # USER
     "SuperUserResponse",
     "UserCreate",
@@ -56,6 +61,44 @@ __all__ = [
     "WorkspaceMemberPublic",
     "Token",
     "PaginatedSuperUserResponse",
+    
+    # WORKSPACE
+    "InviteExternalRequest",
+    "WorkspaceCreate",
+    "WorkspaceResponse",
+    "WorkspaceUpdate",
+    "PaginatedWorkspaceResponse",
+    
+    # TASK
+    "TaskCreate",
+    "TaskFullUpdate",
+    "TaskResponse",
+    "TaskSummary",
+    "PaginatedTaskResponse",
+    "TaskUpdate",
+    
+    # RESOURCE
+    "LinkCreate",
+    "LinkResponse",
+    "LinkUpdate",
+    "NoteCreate",
+    "NoteResponse",
+    "NoteUpdate",
+    "FileResponse",
+    "ResourceSummary",
+
+    # FOLDER
+    "FolderCreate",
+    "FolderResponse",
+    "FolderUpdate",
+
+    # CONVERSATION
+    "ConversationCreate",
+    "ConversationResponse",
+    "ConversationUpdate",
+    "MessageCreate",
+    "MessageResponse",
+    "PaginatedMessageResponse",
 
     # AUTH
     "EmailVerification",

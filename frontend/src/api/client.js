@@ -300,3 +300,41 @@ export async function uploadAvatarRequest(file) {
   })
   return parseResponse(res)
 }
+
+// Resources (scoped to a workspace + task)
+export function listResources(workspaceId, taskId) {
+  return authFetch(`/workspaces/${workspaceId}/tasks/${taskId}/resource/`)
+}
+
+export function createLink(workspaceId, taskId, data) {
+  return authFetch(`/workspaces/${workspaceId}/tasks/${taskId}/resource/links`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function createNote(workspaceId, taskId, data) {
+  return authFetch(`/workspaces/${workspaceId}/tasks/${taskId}/resource/notes`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function deleteResource(workspaceId, taskId, resourceId) {
+  return authFetch(`/workspaces/${workspaceId}/tasks/${taskId}/resource/${resourceId}`, {
+    method: 'DELETE',
+  })
+}
+
+// File resource upload — multipart, same pattern as uploadAvatarRequest.
+export async function uploadResourceFile(workspaceId, taskId, file) {
+  const { access } = getTokens()
+  const form = new FormData()
+  form.append('file', file)
+  const res = await fetch(`${BASE_URL}/workspaces/${workspaceId}/tasks/${taskId}/resource/files`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${access}` },
+    body: form,
+  })
+  return parseResponse(res)
+}

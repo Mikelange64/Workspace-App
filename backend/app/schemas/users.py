@@ -2,11 +2,7 @@ from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from datetime import datetime
 
 
-class Base(BaseModel):
-    pass
-
-
-class UserBase(Base):
+class UserBase(BaseModel):
     username : str   = Field(min_length=5, max_length=50)
     email    : EmailStr = Field(max_length=120)
 
@@ -33,7 +29,7 @@ class SuperUserResponse(UserPrivate):
     is_superuser : bool
 
 
-class PaginatedSuperUserResponse(Base):
+class PaginatedSuperUserResponse(BaseModel):
     users    : list[SuperUserResponse]
     total    : int
     skip     : int

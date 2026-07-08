@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     # PROFILE PIC UPLOAD INFO
     max_upload_size_bytes: int = 5 * 1024 * 1024
 
+    # FILE UPLOAD INFO
+    max_file_upload_size_bytes: int = 30 * 1024 * 1024
+
     # PASSWORD RESET TOKENS
     reset_token_expire_minutes  : int = 60
 

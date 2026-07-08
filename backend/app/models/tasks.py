@@ -21,16 +21,19 @@ class Task(Base):
     content      : Mapped[str] = mapped_column(Text, nullable=False)
     is_completed : Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
-    creator_id: Mapped[int] = mapped_column(
-        Integer, 
-        ForeignKey("users.id"), 
-        nullable=False, 
+    # Nullable + SET NULL: a task is workspace-shared data, so it outlives
+    # whoever created/owned it, same as Workspace.creator_id and
+    # Conversation.creator_id/Message.sender_id.
+    creator_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
         index=True
     )
-    owner_id: Mapped[int] = mapped_column(
-        Integer, 
-        ForeignKey("users.id"), 
-        nullable=False, 
+    owner_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
         index=True
     )
     workspace_id: Mapped[int] = mapped_column(
@@ -46,14 +49,17 @@ class Task(Base):
     due_date     : Mapped[datetime|None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at : Mapped[datetime|None] = mapped_column(DateTime(timezone=True), nullable=True, default=None)
 
-    creator: Mapped["User"] = relationship(
+    creator: Mapped["User | None"] = relationship(
         "User", foreign_keys=[creator_id], back_populates="created_tasks"
     )
-    owner: Mapped["User"]          = relationship(
+    owner: Mapped["User | None"]   = relationship(
         "User", foreign_keys=[owner_id], back_populates="owned_tasks"
     )
     workspace: Mapped["Workspace"] = relationship(
         "Workspace", foreign_keys=[workspace_id], back_populates="tasks"
+    )
+    resources : Mapped[list["Resource"]] = relationship(
+        "Resource", back_populates="task", cascade="all, delete-orphan"
     )
 
     @property

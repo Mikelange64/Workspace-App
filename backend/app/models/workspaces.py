@@ -16,7 +16,12 @@ class Workspace(Base):
     __tablename__ = "workspaces"
 
     id          : Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    creator_id  : Mapped[int] = mapped_column(Integer, ForeignKey("users.id"))
+    # Historical record only - the creator has no special privileges beyond
+    # having been the first admin, so this survives its creator's account
+    # deletion instead of blocking it or taking the workspace down with them.
+    creator_id  : Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     title       : Mapped[str] = mapped_column(String(50), nullable=False)
     description : Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
     max_number  : Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
@@ -28,6 +33,9 @@ class Workspace(Base):
     )
     tasks: Mapped[list["Task"]] = relationship(
         "Task", back_populates="workspace", cascade="all, delete-orphan"
+    )
+    conversations : Mapped[list["Conversation"]] = relationship(
+        "Conversation", back_populates="workspace", cascade="all, delete-orphan"
     )
 
     date_created: Mapped[datetime] = mapped_column(

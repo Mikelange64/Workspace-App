@@ -2,6 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from tests.auth_helpers import (
+    add_workspace_member,
     auth_header,
     create_test_user,
     create_workspace,
@@ -455,6 +456,71 @@ def test_delete_user_removes_user(client: TestClient, user, user_auth_headers):
     # Verify the user is actually gone
     response = client.get(f"{prefix}/{user['id']}")
     assert response.status_code == 404
+
+
+def test_delete_user_removes_workspace_if_last_member(
+    client: TestClient, db_session, user_auth_headers, workspace
+):
+    """Deleting the sole member of a workspace deletes the workspace too -
+    nobody's left to hand it off to."""
+    from app.models import Workspace as WorkspaceModel
+
+    response = client.delete(f"{prefix}/me", headers=user_auth_headers)
+    assert response.status_code == 204
+    assert db_session.get(WorkspaceModel, workspace["id"]) is None
+
+
+def test_delete_user_leaves_workspace_intact_for_other_members(
+    client: TestClient, user_token, user_auth_headers, workspace, second_user, second_user_token
+):
+    """If other members remain, the workspace and its data survive - the user just leaves."""
+    add_workspace_member(client, user_token, workspace["id"], second_user["id"])
+
+    response = client.delete(f"{prefix}/me", headers=user_auth_headers)
+    assert response.status_code == 204
+
+    response = client.get(
+        f"/api/workspaces/{workspace['id']}", headers=auth_header(second_user_token)
+    )
+    assert response.status_code == 200
+
+
+def test_delete_user_promotes_oldest_remaining_member_when_last_admin_leaves(
+    client: TestClient, user_token, user_auth_headers, workspace, second_user, second_user_token
+):
+    """The last admin deleting their account should hand off to the longest-tenured
+    remaining member rather than leave the workspace with no admin."""
+    add_workspace_member(client, user_token, workspace["id"], second_user["id"])
+
+    response = client.delete(f"{prefix}/me", headers=user_auth_headers)
+    assert response.status_code == 204
+
+    response = client.get(
+        f"/api/workspaces/{workspace['id']}/members", headers=auth_header(second_user_token)
+    )
+    assert response.status_code == 200
+    member = next(m for m in response.json() if m["id"] == second_user["id"])
+    assert member["role"] == "admin"
+
+
+def test_delete_user_does_not_reassign_when_other_admin_remains(
+    client: TestClient, user_token, user_auth_headers, workspace, second_user, second_user_token
+):
+    """If another admin already exists, a departing admin shouldn't trigger any reassignment."""
+    add_workspace_member(client, user_token, workspace["id"], second_user["id"])
+    client.patch(
+        f"/api/workspaces/{workspace['id']}/members/{second_user['id']}/admin",
+        headers=user_auth_headers,
+    )
+
+    response = client.delete(f"{prefix}/me", headers=user_auth_headers)
+    assert response.status_code == 204
+
+    response = client.get(
+        f"/api/workspaces/{workspace['id']}/members", headers=auth_header(second_user_token)
+    )
+    member = next(m for m in response.json() if m["id"] == second_user["id"])
+    assert member["role"] == "admin"  # unaffected, was already promoted
 
 
 def test_delete_user_no_auth(client: TestClient):

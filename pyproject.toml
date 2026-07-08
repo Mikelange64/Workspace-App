@@ -9,6 +9,7 @@ dependencies = [
     "alembic>=1.18.4",
     "boto3>=1.43.30",
     "fastapi[standard]>=0.135.2",
+    "filetype>=1.2.0",
     "greenlet>=3.3.2",
     "pillow>=12.2.0",
     "psycopg[binary]>=3.3.4",

@@ -1,8 +1,26 @@
-from app.database import Base
-from .users import User, PasswordResetToken, RefreshToken, VerificationToken
-from .workspaces import Workspace, Folder
+
+
 from .association import WorkspaceMember
+from .conversations import Conversation, ConversationType, Message
+from .resources import Resource, ResourceType
 from .tasks import Task
+from .users import PasswordResetToken, RefreshToken, User, VerificationToken
+from .workspaces import Folder, Workspace
 
+__all__ = [
+    "User",
+    "Workspace",
+    "WorkspaceMember",
+    "Conversation",
+    "Message",
+    "Task",
+    "Resource",
+    "Folder",
 
-__all__ = ["Base", "User", "Workspace", "Folder", "Task", "WorkspaceMember", "PasswordResetToken", "RefreshToken", "VerificationToken"]
+    "PasswordResetToken",
+    "RefreshToken",
+    "VerificationToken",
+
+    "ResourceType",
+    "ConversationType",
+]

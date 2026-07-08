@@ -30,12 +30,13 @@ class User(Base) :
         "Task",
         foreign_keys = "[Task.creator_id]",
         back_populates="creator",
-    ) 
+        passive_deletes=True,
+    )
     owned_tasks : Mapped[list["Task"]] = relationship(
         "Task",
         foreign_keys="[Task.owner_id]",
-        back_populates="owner"
-        
+        back_populates="owner",
+        passive_deletes=True,
     )
     workspaces : Mapped[list["Workspace"]] = relationship(  
         secondary="workspace_member",
@@ -43,20 +44,27 @@ class User(Base) :
         viewonly=True,
     )
     reset_tokens : Mapped[list["PasswordResetToken"]] = relationship(
-        back_populates="user",
-        cascade="all, delete-orphan"
+        back_populates="user", cascade="all, delete-orphan"
     )
     refresh_tokens : Mapped[list["RefreshToken"]] = relationship(
-        back_populates="user",
-        cascade="all, delete-orphan"
+        back_populates="user", cascade="all, delete-orphan"
     )
     verification_tokens : Mapped[list["VerificationToken"]] = relationship(
-        back_populates="user",
-        cascade="all, delete-orphan"
+        back_populates="user", cascade="all, delete-orphan"
     )
     folders : Mapped[list["Folder"]] = relationship(
-        back_populates="owner",
-        cascade="all, delete-orphan"
+        back_populates="owner", cascade="all, delete-orphan"
+    )
+    # Conversations/messages are workspace data, not personal data - they
+    # outlive their creator/sender. creator_id/sender_id get nulled out at
+    # the DB level (ON DELETE SET NULL) instead of cascading, so no ORM
+    # cascade here; passive_deletes lets Postgres handle rows not loaded
+    # in the current session too.
+    conversations_created : Mapped[list["Conversation"]] = relationship(
+        back_populates="creator", passive_deletes=True
+    )
+    messages_sent : Mapped[list["Message"]] = relationship(
+        back_populates="sender", passive_deletes=True
     )
 
     @property

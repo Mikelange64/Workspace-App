@@ -18,6 +18,11 @@ import {
   removeMember,
   searchUser,
   reassignTask,
+  listResources,
+  createLink,
+  createNote,
+  deleteResource,
+  uploadResourceFile,
 } from '../../api/client'
 import { getDaysRemaining, formatDueDate } from '../../utils/date'
 import { getWorkspaceUrgency } from '../../utils/workspaceStatus'
@@ -119,6 +124,41 @@ function ChatIcon() {
   return (
     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  )
+}
+
+function LinkIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    </svg>
+  )
+}
+
+function NoteIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+    </svg>
+  )
+}
+
+function FileIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+    </svg>
+  )
+}
+
+function TrashIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
     </svg>
   )
 }
@@ -622,16 +662,236 @@ function SettingsTab({ workspace, isAdmin, isCreator, workspaceId, onWorkspaceUp
   )
 }
 
-function SlideOver({ task, fullTask, slideOverLoading, workspace, memberById, members, isAdmin, currentUserId, workspaceId, width, onResize, onClose, onToggle, onDelete, onSave, onReassign, onComingSoon }) {
+function ResourceRow({ resource, onDelete }) {
+  const [expanded, setExpanded] = useState(false)
+  const icon = resource.type === 'LINK' ? <LinkIcon /> : resource.type === 'FILE' ? <FileIcon /> : <NoteIcon />
+
+  return (
+    <div className="resource-row">
+      <span className="resource-row__icon">{icon}</span>
+      <div className="resource-row__body">
+        {resource.type === 'LINK' && (
+          <a className="resource-row__title" href={resource.url} target="_blank" rel="noreferrer">
+            {resource.title}
+          </a>
+        )}
+        {resource.type === 'FILE' && (
+          <a className="resource-row__title" href={resource.file_path} target="_blank" rel="noreferrer">
+            {resource.title}
+          </a>
+        )}
+        {resource.type === 'NOTE' && (
+          <>
+            <button
+              type="button"
+              className="resource-row__title resource-row__title--note"
+              onClick={() => setExpanded((v) => !v)}
+            >
+              {resource.title}
+            </button>
+            {expanded && <p className="resource-row__note-content">{resource.content}</p>}
+          </>
+        )}
+      </div>
+      <button type="button" className="resource-row__delete" onClick={onDelete} aria-label="Delete resource">
+        <TrashIcon />
+      </button>
+    </div>
+  )
+}
+
+function ResourcesPanel({ workspaceId, taskId, onToast }) {
+  const [resources, setResources] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [addMode, setAddMode] = useState(null) // null | 'link' | 'note'
+  const [linkTitle, setLinkTitle] = useState('')
+  const [linkUrl, setLinkUrl] = useState('')
+  const [noteTitle, setNoteTitle] = useState('')
+  const [noteContent, setNoteContent] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [formError, setFormError] = useState('')
+  const fileRef = useRef(null)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      try {
+        const data = await listResources(workspaceId, taskId)
+        if (!cancelled) setResources(data)
+      } catch (err) {
+        if (!cancelled) onToast?.(err.detail ?? 'Could not load resources')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [workspaceId, taskId])
+
+  function resetForm() {
+    setAddMode(null)
+    setLinkTitle('')
+    setLinkUrl('')
+    setNoteTitle('')
+    setNoteContent('')
+    setFormError('')
+  }
+
+  async function handleAddLink() {
+    if (!linkTitle.trim() || !linkUrl.trim()) return
+    setSaving(true)
+    setFormError('')
+    try {
+      const created = await createLink(workspaceId, taskId, { title: linkTitle.trim(), url: linkUrl.trim() })
+      setResources((prev) => [...prev, created])
+      resetForm()
+    } catch (err) {
+      setFormError(err.detail ?? 'Could not add link')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleAddNote() {
+    if (!noteTitle.trim()) return
+    setSaving(true)
+    setFormError('')
+    try {
+      const created = await createNote(workspaceId, taskId, { title: noteTitle.trim(), content: noteContent })
+      setResources((prev) => [...prev, created])
+      resetForm()
+    } catch (err) {
+      setFormError(err.detail ?? 'Could not add note')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleFileChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const created = await uploadResourceFile(workspaceId, taskId, file)
+      setResources((prev) => [...prev, created])
+    } catch (err) {
+      onToast?.(err.detail ?? 'Could not upload file')
+    } finally {
+      setUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  async function handleDelete(resourceId) {
+    const prev = resources
+    setResources((r) => r.filter((res) => res.id !== resourceId))
+    try {
+      await deleteResource(workspaceId, taskId, resourceId)
+    } catch (err) {
+      setResources(prev)
+      onToast?.(err.detail ?? 'Could not delete resource')
+    }
+  }
+
+  return (
+    <div className="resources-panel">
+      {loading ? (
+        <p className="slide-over__muted">Loading…</p>
+      ) : resources.length === 0 && !addMode ? (
+        <p className="slide-over__muted">No resources yet.</p>
+      ) : (
+        <div className="resources-panel__list">
+          {resources.map((r) => (
+            <ResourceRow key={r.id} resource={r} onDelete={() => handleDelete(r.id)} />
+          ))}
+        </div>
+      )}
+
+      {addMode === 'link' && (
+        <div className="resources-panel__form">
+          <input
+            className="resources-panel__input"
+            placeholder="Title"
+            value={linkTitle}
+            onChange={(e) => setLinkTitle(e.target.value)}
+            autoFocus
+          />
+          <input
+            className="resources-panel__input"
+            placeholder="https://…"
+            value={linkUrl}
+            onChange={(e) => setLinkUrl(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleAddLink() }}
+          />
+          <div className="resources-panel__form-actions">
+            <button type="button" className="invite-panel__add-btn" onClick={handleAddLink} disabled={saving}>
+              {saving ? 'Adding…' : 'Add link'}
+            </button>
+            <button type="button" className="invite-panel__cancel" onClick={resetForm}>✕</button>
+          </div>
+          {formError && <p className="invite-panel__error">{formError}</p>}
+        </div>
+      )}
+
+      {addMode === 'note' && (
+        <div className="resources-panel__form">
+          <input
+            className="resources-panel__input"
+            placeholder="Title"
+            value={noteTitle}
+            onChange={(e) => setNoteTitle(e.target.value)}
+            autoFocus
+          />
+          <textarea
+            className="slide-over__content-input"
+            placeholder="Note content…"
+            value={noteContent}
+            onChange={(e) => setNoteContent(e.target.value)}
+            rows={3}
+          />
+          <div className="resources-panel__form-actions">
+            <button type="button" className="invite-panel__add-btn" onClick={handleAddNote} disabled={saving}>
+              {saving ? 'Adding…' : 'Add note'}
+            </button>
+            <button type="button" className="invite-panel__cancel" onClick={resetForm}>✕</button>
+          </div>
+          {formError && <p className="invite-panel__error">{formError}</p>}
+        </div>
+      )}
+
+      {!addMode && (
+        <div className="resources-panel__add-row">
+          <input ref={fileRef} type="file" className="resources-panel__file-input" onChange={handleFileChange} tabIndex={-1} />
+          <button type="button" className="resources-panel__add-btn" onClick={() => setAddMode('link')}>+ Link</button>
+          <button type="button" className="resources-panel__add-btn" onClick={() => setAddMode('note')}>+ Note</button>
+          <button
+            type="button"
+            className="resources-panel__add-btn"
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+          >
+            {uploading ? 'Uploading…' : '+ File'}
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function SlideOver({ task, fullTask, slideOverLoading, workspace, memberById, members, isAdmin, currentUserId, workspaceId, width, onResize, onClose, onToggle, onDelete, onSave, onReassign, onComingSoon, onToast }) {
   const [editTitle, setEditTitle] = useState(task.title)
   const [editContent, setEditContent] = useState('')
   const [menuOpen, setMenuOpen, menuRef] = useDismissableMenu()
+  const [activeSlideTab, setActiveSlideTab] = useState('comments')
 
   const widthRef = useRef(width)
   useEffect(() => { widthRef.current = width }, [width])
 
   useEffect(() => { setEditTitle(task.title) }, [task.id])
   useEffect(() => { setEditContent(fullTask?.content ?? '') }, [fullTask])
+  useEffect(() => { setActiveSlideTab('comments') }, [task.id])
 
   useEffect(() => {
     function onKey(e) { if (e.key === 'Escape') onClose() }
@@ -783,16 +1043,31 @@ function SlideOver({ task, fullTask, slideOverLoading, workspace, memberById, me
           </div>
 
           <div className="slide-over__comment-tabs">
-            <button type="button" className="wd-tab wd-tab--active" style={{ paddingLeft: 0 }}>Comments</button>
-            <button type="button" className="wd-tab" onClick={onComingSoon}>
-              Resources <span className="wd-tab__soon">SOON</span>
+            <button
+              type="button"
+              className={`wd-tab${activeSlideTab === 'comments' ? ' wd-tab--active' : ''}`}
+              style={{ paddingLeft: 0 }}
+              onClick={() => setActiveSlideTab('comments')}
+            >
+              Comments
+            </button>
+            <button
+              type="button"
+              className={`wd-tab${activeSlideTab === 'resources' ? ' wd-tab--active' : ''}`}
+              onClick={() => setActiveSlideTab('resources')}
+            >
+              Resources
             </button>
           </div>
 
-          <div className="slide-over__comments-empty">
-            <ChatIcon />
-            <p>Comments coming soon</p>
-          </div>
+          {activeSlideTab === 'comments' ? (
+            <div className="slide-over__comments-empty">
+              <ChatIcon />
+              <p>Comments coming soon</p>
+            </div>
+          ) : (
+            <ResourcesPanel workspaceId={workspaceId} taskId={task.id} onToast={onToast} />
+          )}
         </div>
       </aside>
     </>
@@ -1361,6 +1636,7 @@ function WorkspaceDetail() {
           onSave={handleSaveTask}
           onReassign={(taskId) => setReassignTaskId(taskId)}
           onComingSoon={onComingSoon}
+          onToast={onToast}
         />
       )}
 

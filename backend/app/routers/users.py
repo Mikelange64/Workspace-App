@@ -19,6 +19,7 @@ from app.auth import (
 )
 from app.config import settings
 from app.database import DbSession
+from app.dependencies import handle_membership_departure
 from app.models import (
     PasswordResetToken,
     RefreshToken,
@@ -285,6 +286,13 @@ def update_user(current_user: CurrentUser, user_data: UserUpdate, db: DbSession)
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(current_user: CurrentUser, db: DbSession):
     old_filename = current_user.image_file
+
+    memberships = db.execute(
+        select(WorkspaceMember).where(WorkspaceMember.user_id == current_user.id)
+    ).scalars().all()
+
+    for membership in memberships:
+        handle_membership_departure(membership, db)
 
     db.delete(current_user)
     db.commit()
@@ -565,7 +573,7 @@ def upload_profile_picture(file: UploadFile, current_user: CurrentUser, db: DbSe
     except UnidentifiedImageError as err:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid image file. Please uplaod a valid image(JPEG, PNG, GIF, WebP).",
+            detail="Invalid image file. Please upload a valid image(JPEG, PNG, GIF, WebP).",
         ) from err
 
     try:
@@ -586,7 +594,6 @@ def upload_profile_picture(file: UploadFile, current_user: CurrentUser, db: DbSe
         delete_profile_image(old_filename)
 
     return current_user
-
 
 
 @router.delete("/me/picture", response_model=UserPrivate)

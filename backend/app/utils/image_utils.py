@@ -35,6 +35,9 @@ def _get_s3_client():
 
 def process_profile_image(content: bytes) -> tuple[bytes, str]:
     with Image.open(BytesIO(content)) as original:
+        if original.format not in {"JPEG", "PNG", "WEBP", "GIF"}:
+            raise ValueError("Unsupported image format")
+            
         img = ImageOps.exif_transpose(original)
 
         # crop image to 300x300

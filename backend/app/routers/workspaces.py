@@ -7,7 +7,12 @@ from sqlalchemy.orm import joinedload
 
 from app.auth import CurrentUser
 from app.database import DbSession
-from app.dependencies import get_target_membership, require_admin, require_membership
+from app.dependencies import (
+    get_target_membership,
+    handle_membership_departure,
+    require_admin,
+    require_membership,
+)
 from app.models import User, Workspace, WorkspaceMember
 from app.config import settings
 from app.schemas import (
@@ -280,22 +285,6 @@ def update_workspace_full(
     return workspace
 
 
-@router.delete(
-    "/{workspace_id}/",
-    status_code=status.HTTP_204_NO_CONTENT,
-    dependencies=[Depends(require_admin)],
-)
-def delete_workspace(workspace_id: int, current_user: CurrentUser, db: DbSession):
-    workspace = get_workspace_by_id(workspace_id, db)
-    if workspace.creator_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the workspace creator can delete it",
-        )
-    db.delete(workspace)
-    db.commit()
-
-
 # ========================================================================================
 # MEMBER MANAGEMENT
 # ========================================================================================
@@ -423,34 +412,8 @@ def leave_workspace(
     db: DbSession,
     membership: Annotated[WorkspaceMember, Depends(require_membership)],
 ):
-    if membership.role == "admin":
-        admin_count = db.execute(
-            select(func.count()).where(
-                WorkspaceMember.workspace_id == membership.workspace_id,
-                WorkspaceMember.role == "admin",
-            )
-        ).scalar()
-        if admin_count == 1:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot leave as the last admin, promote someone first",
-            )
-
-    db.delete(membership)
+    handle_membership_departure(membership, db)
     db.commit()
-
-    member_count = db.execute(
-        select(func.count()).where(WorkspaceMember.workspace_id == workspace_id)
-    ).scalar()
-
-    if member_count == 0:
-        workspace = (
-            db.execute(select(Workspace).where(Workspace.id == workspace_id))
-            .scalars()
-            .first()
-        )
-        db.delete(workspace)
-        db.commit()
 
 
 @router.delete(
@@ -466,7 +429,7 @@ def remove_user(workspace_id: int, user_id: int, db: DbSession):
             detail="User is not a member of this workspace",
         )
 
-    db.delete(member)
+    handle_membership_departure(member, db)
     db.commit()
 
     return get_workspace_by_id(workspace_id, db)

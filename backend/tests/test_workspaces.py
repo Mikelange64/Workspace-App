@@ -294,65 +294,6 @@ def test_full_update_workspace_nonexistent(client: TestClient, user_auth_headers
 
 
 # ========================================================================================
-# DELETE WORKSPACE
-# ========================================================================================
-
-
-def test_delete_workspace_as_admin_success(
-    client: TestClient, user_auth_headers, workspace
-):
-    response = client.delete(
-        f"{wsprefix}/{workspace['id']}/", headers=user_auth_headers
-    )
-    assert response.status_code == 204
-
-
-def test_delete_workspace_removes_workspace(
-    client: TestClient, user_auth_headers, workspace
-):
-    client.delete(f"{wsprefix}/{workspace['id']}/", headers=user_auth_headers)
-    response = client.get(f"{wsprefix}/{workspace['id']}", headers=user_auth_headers)
-    assert response.status_code == 404
-
-
-def test_delete_workspace_as_non_admin_member(
-    client: TestClient, user_token, user_auth_headers, workspace, second_user
-):
-    add_workspace_member(client, user_token, workspace["id"], second_user["id"])
-    member_token = login_user(client, email="user2@example.com")
-    response = client.delete(
-        f"{wsprefix}/{workspace['id']}/", headers=auth_header(member_token)
-    )
-    assert_forbidden(response)
-
-
-@pytest.mark.parametrize(
-    "token,expected_status",
-    [
-        pytest.param("stranger", 403, id="non_member"),
-        pytest.param(None, 401, id="no_auth"),
-    ],
-)
-def test_delete_workspace_auth_failures(
-    client: TestClient, db_session, workspace, token, expected_status
-):
-    headers = None
-    if token == "stranger":
-        create_test_user(client, username="stranger", email="stranger@example.com")
-        verify_user_in_db(db_session, "stranger@example.com")
-        token = login_user(client, email="stranger@example.com")
-        headers = auth_header(token)
-    kwargs = {"headers": headers} if headers else {}
-    response = client.delete(f"{wsprefix}/{workspace['id']}/", **kwargs)
-    assert response.status_code == expected_status
-
-
-def test_delete_workspace_nonexistent(client: TestClient, user_auth_headers):
-    response = client.delete(f"{wsprefix}/99999/", headers=user_auth_headers)
-    assert_forbidden(response)
-
-
-# ========================================================================================
 # GET MEMBERS
 # ========================================================================================
 
@@ -605,37 +546,37 @@ def test_leave_workspace_as_admin_with_other_admin(
     assert response.status_code == 204
 
 
-def test_leave_workspace_as_last_admin_rejected(
-    client: TestClient, user_auth_headers, workspace
+def test_leave_workspace_as_last_admin_promotes_oldest_member(
+    client: TestClient, user_token, user_auth_headers, workspace, second_user
 ):
+    """The last admin leaving, with other members remaining, hands adminship
+    off to whoever's been there longest rather than being blocked."""
+    add_workspace_member(client, user_token, workspace["id"], second_user["id"])
+    second_token = login_user(client, email="user2@example.com")
+
     response = client.delete(
         f"{wsprefix}/{workspace['id']}/members/me", headers=user_auth_headers
     )
-    assert response.status_code == 400
-    assert "Cannot leave as the last admin" in response.json()["message"]
+    assert response.status_code == 204
 
-
-def test_leave_workspace_last_member_deletes_workspace(
-    client: TestClient, user, user_token, user_auth_headers, workspace, second_user
-):
-    """If the last member leaves, the workspace itself is deleted."""
-    add_workspace_member(client, user_token, workspace["id"], second_user["id"])
-    member_token = login_user(client, email="user2@example.com")
-
-    # Admin removes themselves from the workspace
-    remove_response = client.delete(
-        f"{wsprefix}/{workspace['id']}/members/{user['id']}",
-        headers=user_auth_headers,
+    response = client.get(
+        f"{wsprefix}/{workspace['id']}/members", headers=auth_header(second_token)
     )
-    assert remove_response.status_code == 200
+    assert response.status_code == 200
+    member = next(m for m in response.json() if m["id"] == second_user["id"])
+    assert member["role"] == "admin"
 
-    # Now only the regular member remains; they leave (last member)
+
+def test_leave_workspace_sole_member_deletes_workspace(
+    client: TestClient, user_auth_headers, workspace
+):
+    """The sole remaining member leaving (whether admin or not) deletes the workspace -
+    nobody's left to hand it off to."""
     response = client.delete(
-        f"{wsprefix}/{workspace['id']}/members/me", headers=auth_header(member_token)
+        f"{wsprefix}/{workspace['id']}/members/me", headers=user_auth_headers
     )
     assert response.status_code == 204
 
-    # Verify workspace is gone
     get_response = client.get(f"{wsprefix}/{workspace['id']}", headers=user_auth_headers)
     assert get_response.status_code == 404
 
