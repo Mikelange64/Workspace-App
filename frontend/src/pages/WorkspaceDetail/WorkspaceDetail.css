@@ -441,6 +441,19 @@
 }
 
 .wd-menu-item:hover { background: var(--color-bg-card); }
+
+.resource-row__context-menu {
+  position: fixed;
+  min-width: 140px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: var(--color-bg-overlay);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-overlay);
+  z-index: 500;
+}
 .wd-menu-item--danger { color: var(--color-error-text); }
 
 /* ─── Inline add ────────────────────────────────────────────────────────────── */
@@ -550,6 +563,14 @@
   top: var(--topbar-height);
   background: rgba(0, 0, 0, 0.35);
   z-index: 199;
+}
+
+/* Lighter delimiter lines only inside the task panel - the rest of the app
+   (workspace details, sidebar) keeps the theme's default border contrast. */
+:root[data-theme='midnight'] .slide-over {
+  --color-border: hsl(222 16% 54%);
+  --color-border-strong: hsl(222 14% 68%);
+  --color-card-top-border: hsl(222 16% 56%);
 }
 
 .slide-over {
@@ -797,6 +818,47 @@ a.resource-row__title:hover { color: var(--color-brand-primary); }
   font-size: 0.82rem;
   color: var(--color-text-muted);
   white-space: pre-wrap;
+}
+
+.resource-row__link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.resource-row__link:hover .resource-row__title { color: var(--color-brand-primary); }
+
+.resource-row__thumb-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.resource-row__thumb {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid var(--color-border);
+}
+
+.resource-row__image-expanded {
+  display: block;
+  max-width: 100%;
+  max-height: 320px;
+  margin-top: 8px;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--color-border);
+  object-fit: contain;
 }
 
 .resource-row__delete {

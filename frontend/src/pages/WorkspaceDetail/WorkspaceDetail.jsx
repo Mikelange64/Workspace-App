@@ -662,20 +662,72 @@ function SettingsTab({ workspace, isAdmin, isCreator, workspaceId, onWorkspaceUp
   )
 }
 
-function ResourceRow({ resource, onDelete }) {
+function ResourceRow({ resource, onDelete, onToast }) {
   const [expanded, setExpanded] = useState(false)
+  const [menuOpen, setMenuOpen, menuRef] = useDismissableMenu()
+  const [menuPos, setMenuPos] = useState({ x: 0, y: 0 })
+  const isImage = resource.type === 'FILE' && resource.mime_type?.startsWith('image/')
+  const hasLinkThumb = resource.type === 'LINK' && !!resource.thumbnail_url
   const icon = resource.type === 'LINK' ? <LinkIcon /> : resource.type === 'FILE' ? <FileIcon /> : <NoteIcon />
 
+  function handleContextMenu(e) {
+    if (resource.type !== 'LINK') return
+    e.preventDefault()
+    setMenuPos({ x: e.clientX, y: e.clientY })
+    setMenuOpen(true)
+  }
+
+  async function handleCopyLink() {
+    setMenuOpen(false)
+    try {
+      await navigator.clipboard.writeText(resource.url)
+      onToast?.('Link copied')
+    } catch {
+      onToast?.('Could not copy link')
+    }
+  }
+
   return (
-    <div className="resource-row">
-      <span className="resource-row__icon">{icon}</span>
+    <div className="resource-row" onContextMenu={handleContextMenu}>
+      {!isImage && !hasLinkThumb && <span className="resource-row__icon">{icon}</span>}
       <div className="resource-row__body">
         {resource.type === 'LINK' && (
-          <a className="resource-row__title" href={resource.url} target="_blank" rel="noreferrer">
-            {resource.title}
+          <a className="resource-row__link" href={resource.url} target="_blank" rel="noreferrer">
+            {hasLinkThumb && (
+              <img className="resource-row__thumb" src={resource.thumbnail_url} alt="" />
+            )}
+            <span className="resource-row__title">{resource.title}</span>
           </a>
         )}
-        {resource.type === 'FILE' && (
+        {menuOpen && (
+          <ul
+            ref={menuRef}
+            className="resource-row__context-menu"
+            style={{ top: menuPos.y, left: menuPos.x }}
+            role="menu"
+          >
+            <li role="none">
+              <button type="button" role="menuitem" className="wd-menu-item" onClick={handleCopyLink}>
+                Copy link
+              </button>
+            </li>
+          </ul>
+        )}
+        {resource.type === 'FILE' && isImage && (
+          <>
+            <button
+              type="button"
+              className="resource-row__thumb-btn"
+              onClick={() => setExpanded((v) => !v)}
+              aria-label={expanded ? 'Collapse image' : 'Expand image'}
+            >
+              <img className="resource-row__thumb" src={resource.file_path} alt={resource.title} />
+              <span className="resource-row__title">{resource.title}</span>
+            </button>
+            {expanded && <img className="resource-row__image-expanded" src={resource.file_path} alt={resource.title} />}
+          </>
+        )}
+        {resource.type === 'FILE' && !isImage && (
           <a className="resource-row__title" href={resource.file_path} target="_blank" rel="noreferrer">
             {resource.title}
           </a>
@@ -700,18 +752,12 @@ function ResourceRow({ resource, onDelete }) {
   )
 }
 
-function ResourcesPanel({ workspaceId, taskId, onToast }) {
+// Fetches every resource for a task once and hands back type-filtered slices
+// plus shared add/delete handlers, so switching between the Notes/Links/Files
+// tabs doesn't re-fetch - only a task change does.
+function useTaskResources(workspaceId, taskId, onToast) {
   const [resources, setResources] = useState([])
   const [loading, setLoading] = useState(true)
-  const [addMode, setAddMode] = useState(null) // null | 'link' | 'note'
-  const [linkTitle, setLinkTitle] = useState('')
-  const [linkUrl, setLinkUrl] = useState('')
-  const [noteTitle, setNoteTitle] = useState('')
-  const [noteContent, setNoteContent] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [formError, setFormError] = useState('')
-  const fileRef = useRef(null)
 
   useEffect(() => {
     let cancelled = false
@@ -730,58 +776,8 @@ function ResourcesPanel({ workspaceId, taskId, onToast }) {
     return () => { cancelled = true }
   }, [workspaceId, taskId])
 
-  function resetForm() {
-    setAddMode(null)
-    setLinkTitle('')
-    setLinkUrl('')
-    setNoteTitle('')
-    setNoteContent('')
-    setFormError('')
-  }
-
-  async function handleAddLink() {
-    if (!linkTitle.trim() || !linkUrl.trim()) return
-    setSaving(true)
-    setFormError('')
-    try {
-      const created = await createLink(workspaceId, taskId, { title: linkTitle.trim(), url: linkUrl.trim() })
-      setResources((prev) => [...prev, created])
-      resetForm()
-    } catch (err) {
-      setFormError(err.detail ?? 'Could not add link')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function handleAddNote() {
-    if (!noteTitle.trim()) return
-    setSaving(true)
-    setFormError('')
-    try {
-      const created = await createNote(workspaceId, taskId, { title: noteTitle.trim(), content: noteContent })
-      setResources((prev) => [...prev, created])
-      resetForm()
-    } catch (err) {
-      setFormError(err.detail ?? 'Could not add note')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function handleFileChange(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setUploading(true)
-    try {
-      const created = await uploadResourceFile(workspaceId, taskId, file)
-      setResources((prev) => [...prev, created])
-    } catch (err) {
-      onToast?.(err.detail ?? 'Could not upload file')
-    } finally {
-      setUploading(false)
-      e.target.value = ''
-    }
+  function handleAdded(resource) {
+    setResources((prev) => [...prev, resource])
   }
 
   async function handleDelete(resourceId) {
@@ -795,87 +791,212 @@ function ResourcesPanel({ workspaceId, taskId, onToast }) {
     }
   }
 
+  return {
+    loading,
+    links: resources.filter((r) => r.type === 'LINK'),
+    notes: resources.filter((r) => r.type === 'NOTE'),
+    files: resources.filter((r) => r.type === 'FILE'),
+    handleAdded,
+    handleDelete,
+  }
+}
+
+function LinksPanel({ workspaceId, taskId, resources, loading, onAdded, onDelete, onToast }) {
+  const [adding, setAdding] = useState(false)
+  const [title, setTitle] = useState('')
+  const [url, setUrl] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState('')
+
+  function resetForm() {
+    setAdding(false)
+    setTitle('')
+    setUrl('')
+    setFormError('')
+  }
+
+  async function handleAdd() {
+    if (!title.trim() || !url.trim()) return
+    setSaving(true)
+    setFormError('')
+    try {
+      const created = await createLink(workspaceId, taskId, { title: title.trim(), url: url.trim() })
+      onAdded(created)
+      resetForm()
+    } catch (err) {
+      setFormError(err.detail ?? 'Could not add link')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="resources-panel">
       {loading ? (
         <p className="slide-over__muted">Loading…</p>
-      ) : resources.length === 0 && !addMode ? (
-        <p className="slide-over__muted">No resources yet.</p>
+      ) : resources.length === 0 && !adding ? (
+        <p className="slide-over__muted">No links yet.</p>
       ) : (
         <div className="resources-panel__list">
           {resources.map((r) => (
-            <ResourceRow key={r.id} resource={r} onDelete={() => handleDelete(r.id)} />
+            <ResourceRow key={r.id} resource={r} onDelete={() => onDelete(r.id)} onToast={onToast} />
           ))}
         </div>
       )}
 
-      {addMode === 'link' && (
+      {adding ? (
         <div className="resources-panel__form">
           <input
             className="resources-panel__input"
             placeholder="Title"
-            value={linkTitle}
-            onChange={(e) => setLinkTitle(e.target.value)}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
             autoFocus
           />
           <input
             className="resources-panel__input"
             placeholder="https://…"
-            value={linkUrl}
-            onChange={(e) => setLinkUrl(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleAddLink() }}
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleAdd() }}
           />
           <div className="resources-panel__form-actions">
-            <button type="button" className="invite-panel__add-btn" onClick={handleAddLink} disabled={saving}>
+            <button type="button" className="invite-panel__add-btn" onClick={handleAdd} disabled={saving}>
               {saving ? 'Adding…' : 'Add link'}
             </button>
             <button type="button" className="invite-panel__cancel" onClick={resetForm}>✕</button>
           </div>
           {formError && <p className="invite-panel__error">{formError}</p>}
         </div>
+      ) : (
+        <div className="resources-panel__add-row">
+          <button type="button" className="resources-panel__add-btn" onClick={() => setAdding(true)}>+ Link</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function NotesPanel({ workspaceId, taskId, resources, loading, onAdded, onDelete, onToast }) {
+  const [adding, setAdding] = useState(false)
+  const [title, setTitle] = useState('')
+  const [content, setContent] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [formError, setFormError] = useState('')
+
+  function resetForm() {
+    setAdding(false)
+    setTitle('')
+    setContent('')
+    setFormError('')
+  }
+
+  async function handleAdd() {
+    if (!title.trim()) return
+    setSaving(true)
+    setFormError('')
+    try {
+      const created = await createNote(workspaceId, taskId, { title: title.trim(), content })
+      onAdded(created)
+      resetForm()
+    } catch (err) {
+      setFormError(err.detail ?? 'Could not add note')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="resources-panel">
+      {loading ? (
+        <p className="slide-over__muted">Loading…</p>
+      ) : resources.length === 0 && !adding ? (
+        <p className="slide-over__muted">No notes yet.</p>
+      ) : (
+        <div className="resources-panel__list">
+          {resources.map((r) => (
+            <ResourceRow key={r.id} resource={r} onDelete={() => onDelete(r.id)} onToast={onToast} />
+          ))}
+        </div>
       )}
 
-      {addMode === 'note' && (
+      {adding ? (
         <div className="resources-panel__form">
           <input
             className="resources-panel__input"
             placeholder="Title"
-            value={noteTitle}
-            onChange={(e) => setNoteTitle(e.target.value)}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
             autoFocus
           />
           <textarea
             className="slide-over__content-input"
             placeholder="Note content…"
-            value={noteContent}
-            onChange={(e) => setNoteContent(e.target.value)}
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
             rows={3}
           />
           <div className="resources-panel__form-actions">
-            <button type="button" className="invite-panel__add-btn" onClick={handleAddNote} disabled={saving}>
+            <button type="button" className="invite-panel__add-btn" onClick={handleAdd} disabled={saving}>
               {saving ? 'Adding…' : 'Add note'}
             </button>
             <button type="button" className="invite-panel__cancel" onClick={resetForm}>✕</button>
           </div>
           {formError && <p className="invite-panel__error">{formError}</p>}
         </div>
-      )}
-
-      {!addMode && (
+      ) : (
         <div className="resources-panel__add-row">
-          <input ref={fileRef} type="file" className="resources-panel__file-input" onChange={handleFileChange} tabIndex={-1} />
-          <button type="button" className="resources-panel__add-btn" onClick={() => setAddMode('link')}>+ Link</button>
-          <button type="button" className="resources-panel__add-btn" onClick={() => setAddMode('note')}>+ Note</button>
-          <button
-            type="button"
-            className="resources-panel__add-btn"
-            onClick={() => fileRef.current?.click()}
-            disabled={uploading}
-          >
-            {uploading ? 'Uploading…' : '+ File'}
-          </button>
+          <button type="button" className="resources-panel__add-btn" onClick={() => setAdding(true)}>+ Note</button>
         </div>
       )}
+    </div>
+  )
+}
+
+function FilesPanel({ workspaceId, taskId, resources, loading, onAdded, onToast, onDelete }) {
+  const [uploading, setUploading] = useState(false)
+  const fileRef = useRef(null)
+
+  async function handleFileChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const created = await uploadResourceFile(workspaceId, taskId, file)
+      onAdded(created)
+    } catch (err) {
+      onToast?.(err.detail ?? 'Could not upload file')
+    } finally {
+      setUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  return (
+    <div className="resources-panel">
+      {loading ? (
+        <p className="slide-over__muted">Loading…</p>
+      ) : resources.length === 0 ? (
+        <p className="slide-over__muted">No files yet.</p>
+      ) : (
+        <div className="resources-panel__list">
+          {resources.map((r) => (
+            <ResourceRow key={r.id} resource={r} onDelete={() => onDelete(r.id)} onToast={onToast} />
+          ))}
+        </div>
+      )}
+
+      <div className="resources-panel__add-row">
+        <input ref={fileRef} type="file" className="resources-panel__file-input" onChange={handleFileChange} tabIndex={-1} />
+        <button
+          type="button"
+          className="resources-panel__add-btn"
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+        >
+          {uploading ? 'Uploading…' : '+ File'}
+        </button>
+      </div>
     </div>
   )
 }
@@ -884,14 +1005,15 @@ function SlideOver({ task, fullTask, slideOverLoading, workspace, memberById, me
   const [editTitle, setEditTitle] = useState(task.title)
   const [editContent, setEditContent] = useState('')
   const [menuOpen, setMenuOpen, menuRef] = useDismissableMenu()
-  const [activeSlideTab, setActiveSlideTab] = useState('comments')
+  const [activeSlideTab, setActiveSlideTab] = useState('files')
+  const taskResources = useTaskResources(workspaceId, task.id, onToast)
 
   const widthRef = useRef(width)
   useEffect(() => { widthRef.current = width }, [width])
 
   useEffect(() => { setEditTitle(task.title) }, [task.id])
   useEffect(() => { setEditContent(fullTask?.content ?? '') }, [fullTask])
-  useEffect(() => { setActiveSlideTab('comments') }, [task.id])
+  useEffect(() => { setActiveSlideTab('files') }, [task.id])
 
   useEffect(() => {
     function onKey(e) { if (e.key === 'Escape') onClose() }
@@ -1045,28 +1167,73 @@ function SlideOver({ task, fullTask, slideOverLoading, workspace, memberById, me
           <div className="slide-over__comment-tabs">
             <button
               type="button"
-              className={`wd-tab${activeSlideTab === 'comments' ? ' wd-tab--active' : ''}`}
+              className={`wd-tab${activeSlideTab === 'files' ? ' wd-tab--active' : ''}`}
               style={{ paddingLeft: 0 }}
+              onClick={() => setActiveSlideTab('files')}
+            >
+              Files
+            </button>
+            <button
+              type="button"
+              className={`wd-tab${activeSlideTab === 'links' ? ' wd-tab--active' : ''}`}
+              onClick={() => setActiveSlideTab('links')}
+            >
+              Links
+            </button>
+            <button
+              type="button"
+              className={`wd-tab${activeSlideTab === 'notes' ? ' wd-tab--active' : ''}`}
+              onClick={() => setActiveSlideTab('notes')}
+            >
+              Notes
+            </button>
+            <button
+              type="button"
+              className={`wd-tab${activeSlideTab === 'comments' ? ' wd-tab--active' : ''}`}
               onClick={() => setActiveSlideTab('comments')}
             >
               Comments
             </button>
-            <button
-              type="button"
-              className={`wd-tab${activeSlideTab === 'resources' ? ' wd-tab--active' : ''}`}
-              onClick={() => setActiveSlideTab('resources')}
-            >
-              Resources
-            </button>
           </div>
 
-          {activeSlideTab === 'comments' ? (
+          {activeSlideTab === 'files' && (
+            <FilesPanel
+              workspaceId={workspaceId}
+              taskId={task.id}
+              resources={taskResources.files}
+              loading={taskResources.loading}
+              onAdded={taskResources.handleAdded}
+              onDelete={taskResources.handleDelete}
+              onToast={onToast}
+            />
+          )}
+          {activeSlideTab === 'links' && (
+            <LinksPanel
+              workspaceId={workspaceId}
+              taskId={task.id}
+              resources={taskResources.links}
+              loading={taskResources.loading}
+              onAdded={taskResources.handleAdded}
+              onDelete={taskResources.handleDelete}
+              onToast={onToast}
+            />
+          )}
+          {activeSlideTab === 'notes' && (
+            <NotesPanel
+              workspaceId={workspaceId}
+              taskId={task.id}
+              resources={taskResources.notes}
+              loading={taskResources.loading}
+              onAdded={taskResources.handleAdded}
+              onDelete={taskResources.handleDelete}
+              onToast={onToast}
+            />
+          )}
+          {activeSlideTab === 'comments' && (
             <div className="slide-over__comments-empty">
               <ChatIcon />
               <p>Comments coming soon</p>
             </div>
-          ) : (
-            <ResourcesPanel workspaceId={workspaceId} taskId={task.id} onToast={onToast} />
           )}
         </div>
       </aside>

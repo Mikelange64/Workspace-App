@@ -22,24 +22,41 @@ export function clearTokens() {
   localStorage.removeItem(STORAGE_KEYS.refresh)
 }
 
+// Refresh tokens rotate on use (the server deletes the old one and issues a
+// new one atomically), so concurrent callers must not each fire their own
+// refresh - only the first would succeed and the rest would 401, clearing
+// the session that first call just established. This makes every caller
+// share a single in-flight refresh instead.
+let refreshPromise = null
+
 async function attemptRefresh() {
-  const { refresh } = getTokens()
-  if (!refresh) throw new Error('No refresh token')
+  if (refreshPromise) return refreshPromise
 
-  const res = await fetch(`${BASE_URL}/users/refresh`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refresh_token: refresh }),
-  })
+  refreshPromise = (async () => {
+    const { refresh } = getTokens()
+    if (!refresh) throw new Error('No refresh token')
 
-  if (!res.ok) {
-    clearTokens()
-    throw new Error('Refresh failed')
+    const res = await fetch(`${BASE_URL}/users/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refresh }),
+    })
+
+    if (!res.ok) {
+      clearTokens()
+      throw new Error('Refresh failed')
+    }
+
+    const data = await res.json()
+    setTokens(data.access_token, data.refresh_token)
+    return data.access_token
+  })()
+
+  try {
+    return await refreshPromise
+  } finally {
+    refreshPromise = null
   }
-
-  const data = await res.json()
-  setTokens(data.access_token, data.refresh_token)
-  return data.access_token
 }
 
 // Authenticated fetch — adds Bearer header, retries once after a 401 via refresh.

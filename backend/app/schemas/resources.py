@@ -19,7 +19,8 @@ class LinkCreate(BaseModel):
 
 
 class LinkResponse(ResourceBase):
-    url : HttpUrl
+    url           : HttpUrl
+    thumbnail_url : str | None = None
 
 
 class LinkUpdate(BaseModel):
@@ -50,4 +51,9 @@ class FileResponse(ResourceBase):
 # =============================================== MIXED LIST =================================================
 
 class ResourceSummary(ResourceBase):
-    type : str
+    type          : str
+    url           : HttpUrl | None = None
+    content       : str | None = None
+    file_path     : str | None = None
+    mime_type     : str | None = None
+    thumbnail_url : str | None = None

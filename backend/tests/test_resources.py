@@ -239,6 +239,110 @@ def test_update_link_by_other_workspace_member_allowed(
     assert response.json()["title"] == "Edited by teammate"
 
 
+class _FakeOembedResponse:
+    def __init__(self, json_data):
+        self._json_data = json_data
+
+    def raise_for_status(self):
+        pass
+
+    def json(self):
+        return self._json_data
+
+
+def test_create_link_with_oembed_provider_gets_thumbnail(
+    client: TestClient, user_auth_headers, workspace, task, monkeypatch
+):
+    def fake_get(url, params=None, timeout=None, follow_redirects=None):
+        assert url == "https://www.youtube.com/oembed"
+        assert params["url"] == "https://www.youtube.com/watch?v=abc123"
+        return _FakeOembedResponse({"thumbnail_url": "https://i.ytimg.com/vi/abc123/hqdefault.jpg"})
+
+    monkeypatch.setattr("app.utils.oembed.httpx.get", fake_get)
+
+    response = client.post(
+        resource_path(workspace["id"], task["id"], "/links"),
+        json={"title": "Cool video", "url": "https://www.youtube.com/watch?v=abc123"},
+        headers=user_auth_headers,
+    )
+    assert response.status_code == 201
+    assert response.json()["thumbnail_url"] == "https://i.ytimg.com/vi/abc123/hqdefault.jpg"
+
+
+def test_create_link_non_provider_skips_oembed_call(
+    client: TestClient, user_auth_headers, workspace, task, monkeypatch
+):
+    def fake_get(*args, **kwargs):
+        raise AssertionError("should not call oEmbed for a non-provider domain")
+
+    monkeypatch.setattr("app.utils.oembed.httpx.get", fake_get)
+
+    response = client.post(
+        resource_path(workspace["id"], task["id"], "/links"),
+        json={"title": "Some site", "url": "https://example.com/article"},
+        headers=user_auth_headers,
+    )
+    assert response.status_code == 201
+    assert response.json()["thumbnail_url"] is None
+
+
+def test_create_link_oembed_failure_does_not_block_creation(
+    client: TestClient, user_auth_headers, workspace, task, monkeypatch
+):
+    import httpx
+
+    def fake_get(*args, **kwargs):
+        raise httpx.ConnectTimeout("timed out")
+
+    monkeypatch.setattr("app.utils.oembed.httpx.get", fake_get)
+
+    response = client.post(
+        resource_path(workspace["id"], task["id"], "/links"),
+        json={"title": "Cool video", "url": "https://youtu.be/abc123"},
+        headers=user_auth_headers,
+    )
+    assert response.status_code == 201
+    assert response.json()["thumbnail_url"] is None
+
+
+def test_create_link_oembed_non_https_thumbnail_ignored(
+    client: TestClient, user_auth_headers, workspace, task, monkeypatch
+):
+    """A provider returning something other than a plain https thumbnail URL is discarded, not trusted as-is."""
+    monkeypatch.setattr(
+        "app.utils.oembed.httpx.get",
+        lambda *a, **k: _FakeOembedResponse({"thumbnail_url": "javascript:alert(1)"}),
+    )
+
+    response = client.post(
+        resource_path(workspace["id"], task["id"], "/links"),
+        json={"title": "Sketchy", "url": "https://youtu.be/abc"},
+        headers=user_auth_headers,
+    )
+    assert response.status_code == 201
+    assert response.json()["thumbnail_url"] is None
+
+
+def test_update_link_url_refreshes_thumbnail(
+    client: TestClient, user_auth_headers, user_token, workspace, task, monkeypatch
+):
+    link = create_link(client, user_token, workspace["id"], task["id"])
+    assert link.get("thumbnail_url") is None
+
+    monkeypatch.setattr(
+        "app.utils.oembed.httpx.get",
+        lambda *a, **k: _FakeOembedResponse({"thumbnail_url": "https://i.ytimg.com/vi/xyz/hqdefault.jpg"}),
+    )
+
+    response = client.patch(
+        resource_path(workspace["id"], task["id"], f"/links/{link['id']}"),
+        json={"url": "https://www.youtube.com/watch?v=xyz"},
+        headers=user_auth_headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["thumbnail_url"] == "https://i.ytimg.com/vi/xyz/hqdefault.jpg"
+
+
 # ========================================================================================
 # NOTES
 # ========================================================================================
@@ -343,6 +447,8 @@ def test_upload_file_success(
     assert data["title"] == "report.pdf"
     assert data["mime_type"] == "application/pdf"
     assert data["file_path"].startswith("https://")
+    # Forces a download instead of the browser rendering the object inline.
+    assert "response-content-disposition=attachment" in data["file_path"]
 
 
 def test_upload_file_too_large(client: TestClient, user_auth_headers, workspace, task, mocked_s3):
@@ -361,10 +467,37 @@ def test_upload_file_too_large(client: TestClient, user_auth_headers, workspace,
 def test_upload_file_unrecognizable_content_rejected(
     client: TestClient, user_auth_headers, workspace, task, mocked_s3
 ):
-    """Plain text has no magic bytes for filetype to sniff, so it can never pass validation."""
+    """Content with no magic bytes and not valid UTF-8 either can't be classified at all."""
+    garbage = b"\xff\xfe\xfd\xfc" * 10
+    response = client.post(
+        resource_path(workspace["id"], task["id"], "/files"),
+        files={"file": ("mystery.bin", garbage, "application/octet-stream")},
+        headers=user_auth_headers,
+    )
+    assert response.status_code == 400
+    assert "Invalid file" in response.json()["message"]
+
+
+def test_upload_file_plain_text_accepted(
+    client: TestClient, user_auth_headers, workspace, task, mocked_s3
+):
+    """Plain text has no magic bytes for filetype to sniff, so it's detected via UTF-8 decode instead."""
     response = client.post(
         resource_path(workspace["id"], task["id"], "/files"),
         files={"file": ("note.txt", b"just plain text, no magic bytes here", "text/plain")},
+        headers=user_auth_headers,
+    )
+    assert response.status_code == 201
+    assert response.json()["mime_type"] == "text/plain"
+
+
+def test_upload_file_utf8_content_wrong_extension_rejected(
+    client: TestClient, user_auth_headers, workspace, task, mocked_s3
+):
+    """Valid UTF-8 alone isn't enough - CSV/JSON/etc. shouldn't be silently accepted as text/plain."""
+    response = client.post(
+        resource_path(workspace["id"], task["id"], "/files"),
+        files={"file": ("data.csv", b"col1,col2\n1,2", "text/csv")},
         headers=user_auth_headers,
     )
     assert response.status_code == 400
@@ -374,15 +507,94 @@ def test_upload_file_unrecognizable_content_rejected(
 def test_upload_file_recognized_but_disallowed_type_rejected(
     client: TestClient, user_auth_headers, workspace, task, mocked_s3
 ):
-    """A real, sniffable format (PNG) that isn't in ALLOWED_MIME_TYPES should still be rejected."""
-    png_header = b"\x89PNG\r\n\x1a\n" + b"0" * 20
+    """A real, sniffable format (zip) that isn't in ALLOWED_MIME_TYPES should still be rejected."""
+    zip_header = b"PK\x03\x04" + b"0" * 20
     response = client.post(
         resource_path(workspace["id"], task["id"], "/files"),
-        files={"file": ("image.png", png_header, "image/png")},
+        files={"file": ("archive.zip", zip_header, "application/zip")},
         headers=user_auth_headers,
     )
     assert response.status_code == 400
     assert "Invalid file" in response.json()["message"]
+
+
+def test_upload_file_image_accepted(
+    client: TestClient, user_auth_headers, workspace, task, mocked_s3, test_image
+):
+    """Images are allowed file resources and get a real presigned file_path."""
+    response = client.post(
+        resource_path(workspace["id"], task["id"], "/files"),
+        files={"file": ("image.jpg", test_image, "image/jpeg")},
+        headers=user_auth_headers,
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert data["mime_type"] == "image/jpeg"
+    assert data["file_path"]
+
+
+def test_upload_image_with_bad_data_rejected(
+    client: TestClient, user_auth_headers, workspace, task, mocked_s3
+):
+    """Magic bytes alone aren't a full validity check - Pillow may still fail to decode it."""
+    fake_png = b"\x89PNG\r\n\x1a\n" + b"0" * 20
+    response = client.post(
+        resource_path(workspace["id"], task["id"], "/files"),
+        files={"file": ("image.png", fake_png, "image/png")},
+        headers=user_auth_headers,
+    )
+    assert response.status_code == 400
+    assert "Invalid image" in response.json()["message"]
+
+
+def test_upload_oversized_image_is_downscaled(
+    client: TestClient, user_auth_headers, workspace, task, mocked_s3
+):
+    """Images over the max dimension get proportionally downscaled before storage."""
+    from PIL import Image as PILImage
+
+    from app.config import settings
+
+    huge = PILImage.new("RGB", (3000, 1500), color="blue")
+    buf = BytesIO()
+    huge.save(buf, "JPEG")
+
+    response = client.post(
+        resource_path(workspace["id"], task["id"], "/files"),
+        files={"file": ("huge.jpg", buf.getvalue(), "image/jpeg")},
+        headers=user_auth_headers,
+    )
+    assert response.status_code == 201
+
+    objects = mocked_s3.list_objects_v2(Bucket=settings.s3_bucket_name)["Contents"]
+    stored = mocked_s3.get_object(Bucket=settings.s3_bucket_name, Key=objects[0]["Key"])
+    stored_img = PILImage.open(BytesIO(stored["Body"].read()))
+    assert max(stored_img.size) <= 2000
+    assert stored_img.size[0] / stored_img.size[1] == pytest.approx(2, abs=0.01)
+
+
+def test_upload_gif_not_re_encoded(
+    client: TestClient, user_auth_headers, workspace, task, mocked_s3
+):
+    """GIFs are passed through untouched - re-encoding would collapse animation to one frame."""
+    from PIL import Image as PILImage
+
+    gif = PILImage.new("RGB", (50, 50), color="green")
+    buf = BytesIO()
+    gif.save(buf, "GIF")
+    gif_bytes = buf.getvalue()
+
+    response = client.post(
+        resource_path(workspace["id"], task["id"], "/files"),
+        files={"file": ("clip.gif", gif_bytes, "image/gif")},
+        headers=user_auth_headers,
+    )
+    assert response.status_code == 201
+
+    from app.config import settings
+    objects = mocked_s3.list_objects_v2(Bucket=settings.s3_bucket_name)["Contents"]
+    stored = mocked_s3.get_object(Bucket=settings.s3_bucket_name, Key=objects[0]["Key"])
+    assert stored["Body"].read() == gif_bytes
 
 
 def test_upload_file_non_member(client: TestClient, db_session, workspace, task, mocked_s3, fake_pdf_bytes):
