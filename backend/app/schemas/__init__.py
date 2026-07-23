@@ -14,6 +14,7 @@ from .conversations import (
     ConversationWithWorkspace,
     MessageCreate,
     MessageResponse,
+    MessageSource,
     PaginatedMessageResponse,
 )
 from .folders import FolderCreate, FolderResponse, FolderUpdate
@@ -104,6 +105,7 @@ __all__ = [
     "ConversationWithWorkspace",
     "MessageCreate",
     "MessageResponse",
+    "MessageSource",
     "PaginatedMessageResponse",
 
     # AUTH

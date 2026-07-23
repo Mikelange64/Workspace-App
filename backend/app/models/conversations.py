@@ -1,7 +1,7 @@
 from datetime import datetime, UTC
 from enum import Enum
 
-from sqlalchemy import Integer, Text, ForeignKey, DateTime, String, Boolean, Enum as sqlEnum, func
+from sqlalchemy import Integer, Text, ForeignKey, DateTime, String, Boolean, JSON, Enum as sqlEnum, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -93,6 +93,9 @@ class Message(Base):
     )
     sender_type     : Mapped[SenderType] = mapped_column(sqlEnum(SenderType), nullable=False)
     content         : Mapped[str] = mapped_column(Text, nullable=False)
+    # List of {"title", "url"} dicts from the web_search tool, in the order
+    # they were found - null for messages that never triggered a search.
+    sources         : Mapped[list[dict] | None] = mapped_column(JSON, nullable=True, default=None)
     created_at      : Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )

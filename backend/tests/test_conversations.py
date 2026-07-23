@@ -150,7 +150,7 @@ def test_create_conversation_bot_type(client: TestClient, premium_user, user_aut
 
 
 def test_create_conversation_bot_type_requires_premium(
-    client: TestClient, user_auth_headers, workspace
+    client: TestClient, non_premium_user, user_auth_headers, workspace
 ):
     response = client.post(
         conversation_path(workspace["id"], "/"),

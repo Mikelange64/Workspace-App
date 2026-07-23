@@ -119,6 +119,18 @@ def premium_user(user, db_session):
 
 
 @pytest.fixture
+def non_premium_user(user, db_session):
+    """Downgrade the default test user to non-premium - new users default to
+    premium (portfolio project, every signup should be able to try Filobelo),
+    so tests exercising the premium gate itself need this explicitly."""
+    from app.models import User as UserModel
+    u = db_session.get(UserModel, user["id"])
+    u.is_premium = False
+    db_session.flush()
+    return user
+
+
+@pytest.fixture
 def user_token(client, user):
     """Return a valid auth token for the default user."""
     return login_user(client)

@@ -17,7 +17,7 @@ class User(Base) :
     password_hash : Mapped[str] = mapped_column(String(255), nullable=False)
     is_verified   : Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_superuser  : Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    is_premium    : Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_premium    : Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     image_file    : Mapped[str | None] = mapped_column(String(200), default=None)
     last_login    : Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     joined_at     : Mapped[datetime] = mapped_column(

@@ -2159,6 +2159,53 @@ a.resource-row__title:hover {
     color: var(--color-text-muted);
 }
 
+.message-row__sources {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.message-row__sources-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+}
+
+.message-row__sources-chevron {
+    font-size: 0.65rem;
+}
+
+.message-row__sources-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px 10px;
+    margin: 0;
+    list-style: none;
+    background: var(--color-bg-card);
+    border-radius: 10px;
+    max-width: 320px;
+}
+
+.message-row__sources-list a {
+    font-size: 0.8rem;
+    color: var(--color-brand-primary);
+    text-decoration: none;
+    word-break: break-word;
+}
+
+.message-row__sources-list a:hover {
+    text-decoration: underline;
+}
+
 .conversation-thread__input-row {
     display: flex;
     align-items: center;

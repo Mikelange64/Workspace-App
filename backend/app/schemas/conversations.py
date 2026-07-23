@@ -40,6 +40,11 @@ class MessageCreate(BaseModel):
     sender_type : SenderType = SenderType.USER
 
 
+class MessageSource(BaseModel):
+    title : str
+    url   : str
+
+
 class MessageResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -48,6 +53,7 @@ class MessageResponse(BaseModel):
     sender_id       : int | None
     sender_type     : SenderType
     content         : str
+    sources         : list[MessageSource] | None = None
     created_at      : datetime
 
 

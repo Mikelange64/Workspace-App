@@ -101,7 +101,7 @@ class FilobeloBot:
         ]
 
         try:
-            message = self._run_completion(messages)
+            message, sources = self._run_completion(messages)
         except Exception as e :
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="AI service unavailable"
@@ -118,6 +118,7 @@ class FilobeloBot:
             conversation_id = conversation_id,
             sender_type     = SenderType.BOT,
             content         = reply,
+            sources         = sources or None,
             created_at      = now
         )
         conversation.last_message_at = now
@@ -130,11 +131,14 @@ class FilobeloBot:
         return response
 
 
-    def _run_completion(self, messages: list[dict]):
+    def _run_completion(self, messages: list[dict]) -> tuple[object, list[dict]]:
         """Calls the model, and if it requests the web_search tool, runs the
         search and feeds the result back - up to MAX_SEARCH_ROUNDS times -
-        before returning the final assistant message."""
+        before returning the final assistant message, plus every source
+        (deduped by url) collected along the way."""
         tools = [SEARCH_TOOL] if settings.tavily_api_key else None
+        sources: list[dict] = []
+        seen_urls: set[str] = set()
 
         for _ in range(MAX_SEARCH_ROUNDS):
             response = self.client.chat.completions.create(
@@ -148,7 +152,7 @@ class FilobeloBot:
             message = response.choices[0].message
             tool_calls = getattr(message, "tool_calls", None)
             if not tool_calls:
-                return message
+                return message, sources
 
             messages.append({
                 "role": "assistant",
@@ -167,7 +171,11 @@ class FilobeloBot:
             })
             for call in tool_calls:
                 args = json.loads(call.function.arguments)
-                result = self._search_web(args.get("query", ""))
+                result, results = self._search_web(args.get("query", ""))
+                for r in results:
+                    if r["url"] not in seen_urls:
+                        seen_urls.add(r["url"])
+                        sources.append(r)
                 messages.append({
                     "role": "tool",
                     "tool_call_id": call.id,
@@ -183,13 +191,13 @@ class FilobeloBot:
             reasoning_effort="high",
             extra_body={"thinking": {"type": "enabled"}}
         )
-        return response.choices[0].message
+        return response.choices[0].message, sources
 
 
     @staticmethod
-    def _search_web(query: str, max_results: int = 5) -> str:
+    def _search_web(query: str, max_results: int = 5) -> tuple[str, list[dict]]:
         if not settings.tavily_api_key:
-            return "Web search is not available right now."
+            return "Web search is not available right now.", []
 
         try:
             response = httpx.post(
@@ -204,15 +212,21 @@ class FilobeloBot:
             response.raise_for_status()
             results = response.json().get("results", [])
         except Exception as e:
-            return f"Search failed: {e}"
+            return f"Search failed: {e}", []
 
         if not results:
-            return "No results found."
+            return "No results found.", []
 
-        return "\n".join(
+        formatted = "\n".join(
             f"- {r.get('title', '')} ({r.get('url', '')}): {r.get('content', '')[:300]}"
             for r in results
         )
+        sources = [
+            {"title": r.get("title") or r.get("url", ""), "url": r["url"]}
+            for r in results
+            if r.get("url")
+        ]
+        return formatted, sources
 
 
     @staticmethod
